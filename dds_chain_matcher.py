@@ -790,92 +790,292 @@ CHAIN_LIBRARY = [
     },
 
     # ------------------------------------------------------------------
-    # CHAIN 17: BUR3 No Output Frequency
-    # Observed in: IRPRP33586 (2 events), IRPRP33792 (3 events)
-    # ECode: 2014, EnvBl: EG_BUR3
-    # Mechanism: BUR3 auxiliary converter loses output frequency — 
-    #   internal hardware fault in BUR3 converter stage.
-    #   Distinct from lifesign loss (which is MVB communication dropout).
-    #   This is an internal BUR3 fault reported by BUR3 itself.
+    # CHAIN 19: Fuse 415/110V Circuit Blown
+    # M2HR frequency: 49 occurrences across fleet — most common unmatched
+    # fault type in the entire register.
+    # ECode 507E, EnvBl EG_STB1_HBB1, Event MV_ECrBk415_110
+    # Mechanism: the 415V/110V auxiliary supply fuse (in STB1/HBB1 cubicle)
+    #   blows → auxiliary loads on that circuit lose supply → CCUO logs
+    #   the loss. Physical fuse replacement required — not a card fault.
     # ------------------------------------------------------------------
     {
-        "chain_id":    "BUR3_NO_OUTPUT",
-        "name":        "BUR3 Output Frequency Loss → Auxiliary Converter Fault",
-        "subsystem":   "Auxiliary Converter (BUR3)",
+        "chain_id":    "FUSE_415_110V",
+        "name":        "Fuse 415/110V Circuit Blown → Auxiliary Supply Loss",
+        "subsystem":   "Auxiliary Supply (STB1/HBB1)",
         "dcu_aware":   False,
-        "max_window":  10,
+        "max_window":  30,
         "trigger": [
             {"match": "contains", "field": "Dist Text",
-             "value": "BUR3:0021"},
+             "value": "CCUO:0127"},
             {"match": "contains", "field": "Dist Text",
-             "value": "No Output Frequency"},
+             "value": "Fuse 415/110V circuit blown"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MV_ECrBk415_110"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "507E"},
         ],
         "propagation": [
             {"match": "contains", "field": "Dist Text",
-             "value": "SS07 auxiliary converter"},
+             "value": "auxiliary converter"},
             {"match": "contains", "field": "Dist Text",
-             "value": "auxiliary converter2 off"},
+             "value": "blower MCB"},
         ],
         "terminal": [
             {"match": "contains", "field": "Dist Text",
-             "value": "SS07 auxiliary converter"},
+             "value": "SS06"},
             {"match": "contains", "field": "Dist Text",
-             "value": "Isolation demand SS07"},
+             "value": "SS07"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
         ],
         "severity":    "HIGH",
         "action":      (
-            "BUR3 internal output frequency fault — not a communication/lifesign dropout. "
-            "ECode 2014 points to BUR3 converter stage hardware. "
-            "Check BUR3 rack (SB-2): inspect inverter stage and gate driver cards. "
-            "Check MCB 127.22/3 in SB-2. Verify BUR3 output voltage at battery terminals. "
-            "If BUR3 output voltage is zero after MCB reset: inverter card replacement required. "
-            "Do not confuse with BUR_LIFESIGN_LOSS — that is MVB communication loss, "
-            "this is an internal BUR3 hardware failure."
+            "Fuse 415V/110V circuit blown in STB1/HBB1 cubicle. "
+            "Locate fuse F1 or F2 in HBB1 (Cab 1 side auxiliary supply). "
+            "Replace blown fuse — check rating before replacing (do not uprate). "
+            "If fuse blows again immediately after replacement: earth fault or short circuit "
+            "on the 415V/110V circuit — DO NOT replace again. "
+            "Isolate the circuit, identify the shorted load (check auxiliary motor windings "
+            "and wiring in HB-1 cubicle), clear fault before refitting fuse. "
+            "Single blow with no recurrence: may be a transient — replace and monitor."
         ),
     },
 
     # ------------------------------------------------------------------
-    # CHAIN 18: BUR2 Inverter Fault → SS07 Isolation
-    # Observed in: IRPRP33792 (3 events, ECode 1501)
-    # Mechanism: BUR2 reports internal inverter fault → SS07 auxiliary
-    #   converter 2 shuts off. Internal BUR2 hardware failure, distinct
-    #   from the lifesign/MVB communication dropout pattern.
+    # CHAIN 20: Earth Fault Control Circuit
+    # M2HR frequency: 30 occurrences — safety-critical, must not be deferred.
+    # ECode 507C, EnvBl EG_STB1_HBB1, Event MV_EGndFlrCtr
+    # Mechanism: earth fault detected on the control circuit wiring →
+    #   CCUO isolates affected circuit to prevent further damage.
+    #   Can indicate wiring insulation breakdown, moisture ingress,
+    #   or a failed component with its output shorted to earth.
     # ------------------------------------------------------------------
     {
-        "chain_id":    "BUR2_INVERTER_FAULT",
-        "name":        "BUR2 Inverter Fault → Auxiliary Converter 2 Isolation",
-        "subsystem":   "Auxiliary Converter (BUR2)",
+        "chain_id":    "EARTH_FAULT_CTRL",
+        "name":        "Earth Fault → Control Circuit Isolation",
+        "subsystem":   "Control Circuit Wiring (STB1/HBB1)",
         "dcu_aware":   False,
-        "max_window":  10,
+        "max_window":  60,
         "trigger": [
             {"match": "contains", "field": "Dist Text",
-             "value": "BUR2:0002"},
+             "value": "CCUO:0125"},
             {"match": "contains", "field": "Dist Text",
-             "value": "Inverter fault"},
+             "value": "Earth fault control circuit"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MV_EGndFlrCtr"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "507C"},
         ],
         "propagation": [
             {"match": "contains", "field": "Dist Text",
-             "value": "SS07 auxiliary converter"},
+             "value": "Power Off MCE"},
             {"match": "contains", "field": "Dist Text",
-             "value": "auxiliary converter2 off"},
+             "value": "Subsystem"},
         ],
         "terminal": [
             {"match": "contains", "field": "Dist Text",
-             "value": "SS07 auxiliary converter"},
+             "value": "SS01"},
             {"match": "contains", "field": "Dist Text",
-             "value": "Isolation demand SS07"},
-            {"match": "contains", "field": "Dist Text",
-             "value": "auxiliary converter2 off"},
+             "value": "Power Off MCE"},
         ],
         "severity":    "HIGH",
         "action":      (
-            "BUR2 internal inverter fault (ECode 1501) — inverter stage hardware failure. "
-            "Check BUR2 rack in SB-2: inspect inverter power stage and gate driver cards. "
-            "Check MCB 127.22/2 in SB-2. Reset once after MCE OFF. "
-            "If fault recurs immediately on power-on: inverter card replacement required — "
-            "no recovery by reset. "
-            "Monitor battery charging after BUR2 isolation — below 86V converters switch off, "
-            "below 82V relief loco needed."
+            "Earth fault on control circuit — DO NOT defer. "
+            "Measure insulation resistance (IR) on the control circuit wiring in STB1/HBB1 "
+            "with a megger. IR < 1 MΩ confirms an earth fault. "
+            "Check: (1) Wiring harness condition in HBB1 — look for chafing, moisture, "
+            "or burnt insulation. "
+            "(2) Control circuit contactors and relays for shorted coils. "
+            "(3) Any recently replaced components in the control circuit path. "
+            "If fault is intermittent (clears on reset): check connectors for moisture "
+            "or corrosion — clean and reseat. "
+            "Loco must not be returned to service until IR reading is confirmed healthy. "
+            "Repeated earth fault after clearance: suspect wiring harness replacement needed."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 21: Compressor MCB Open (Standalone)
+    # M2HR frequency: 74 occurrences combined (0142 x29, 0134 x45)
+    # These fire without the MR pressure interlock — the compressor MCB
+    #   trips before pressure falls enough to trigger MR_PRESSURE_BRAKE.
+    # ECode 508D (comp 2, HBB2), 5085 (comp 1, HBB1)
+    # Important: if BOTH compressor MCBs open (0134 variant), it's more
+    #   serious — earth fault or supply issue affecting both circuits.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "COMPRESSOR_MCB",
+        "name":        "Compressor MCB Open → Air Supply Degradation",
+        "subsystem":   "Auxiliary Supply (Compressor Circuit)",
+        "dcu_aware":   False,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0142"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCB of compressor 2 open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0134"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCB of compressor 1 open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCB of compressor 1 and 2 open"},
+            {"match": "event",    "field": "Event Name",
+             "value": "XCV_ECrBkCmp1Off"},
+            {"match": "event",    "field": "Event Name",
+             "value": "XCV_ECrBkCmp2Off"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "508D"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "5085"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "main res. low"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "S/R interlock"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "brake interlock"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0042"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Compressor MCB open. "
+            "MCB 47.1/1 (HB1) = Compressor 1. MCB 47.1/2 (HB2) = Compressor 2. "
+            "Reset once after opening VCB. If MCB holds: monitor MR pressure recovery "
+            "(should reach 8–9 kg/cm² within 5–7 minutes). "
+            "If MCB trips again immediately: DO NOT reset — likely compressor motor "
+            "overload or earth fault. Work on remaining compressor. "
+            "If BOTH MCBs open simultaneously: common-cause fault — check "
+            "auxiliary supply to both compressor circuits before resetting either. "
+            "Check auto drain valve condition and auto drain valve timer setting — "
+            "excessive drain cycling can overload the compressor motor. "
+            "Persistent MCB trips after reset: compressor motor winding check required."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 22: Transformer Oil Pump MCB Open (Standalone)
+    # M2HR frequency: 17 occurrences (0152 x11, 0122 x6)
+    # These fire without the TRAFO_OIL chain trigger — the MCB trips
+    #   before temperature rises enough to trigger the temperature chain.
+    # ECode 5097 (pump 2, HBB2), 5079 (pump 1, HBB1)
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "TRAFO_PUMP_MCB",
+        "name":        "Transformer Oil Pump MCB Open → Cooling Degradation",
+        "subsystem":   "Transformer Cooling Circuit",
+        "dcu_aware":   False,
+        "max_window":  45,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0152"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Transformer pump 2 MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0122"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Transformer pump 1 MCB open"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MT2_ECrBkOilPmp2"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MT1_ECrBkOilPmp1"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "5097"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "5079"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Dist. one trafo oil circuit"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "trafo oil"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Dist. both trafo oil circuits"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0082"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Transformer oil pump MCB open. "
+            "MCB 62.1/1 (HB1) = Oil pump 1. MCB 62.1/2 (HB2) = Oil pump 2. "
+            "Reset MCB once after opening VCB. If MCB holds and no temperature alarm "
+            "follows: monitor and continue. "
+            "If MCB trips again: oil pump motor fault — check pump motor winding "
+            "resistance and mechanical freedom (seized bearing causes overload). "
+            "Check oil level in expansion tanks — low oil level increases pump load. "
+            "If BOTH pump MCBs open: check BUR output voltage balance — unbalanced "
+            "BUR voltage is a common cause of simultaneous pump MCB trips. "
+            "Oil cooler blower MCBs 59.1/1 and 59.1/2 should also be checked — "
+            "blower fault can cause temperature rise that leads to further trips."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 23: DCU AMP Parameter Change Error
+    # M2HR frequency: 15 occurrences — typically occurs after card
+    #   replacement if the replacement card has a different firmware
+    #   version or parameter set than the loco spec.
+    # ECode 514E (DCU1), EnvBl EG_VCI, Event AM_E_ParChgAmpDCU1
+    # Also appears as CCUO:0247 for DCU2.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "DCU_PARAM_ERROR",
+        "name":        "DCU AMP Parameter Change Error → Configuration Mismatch",
+        "subsystem":   "Traction Converter (VCI / Parameter Store)",
+        "dcu_aware":   True,
+        "max_window":  20,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0246"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0247"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "AMP Parameter Change Error"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Parameter Change Error"},
+            {"match": "event",    "field": "Event Name",
+             "value": "AM_E_ParChgAmpDCU1"},
+            {"match": "event",    "field": "Event Name",
+             "value": "AM_E_ParChgAmpDCU2"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "514E"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "514F"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Iso Request CON"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Subsystem"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS01"},
+        ],
+        "severity":    "MEDIUM",
+        "action":      (
+            "DCU AMP parameter change error — configuration mismatch detected. "
+            "Check maintenance history: has any card been recently replaced in "
+            "the traction converter (CON1 or CON2)? "
+            "If yes: verify that the replacement card's firmware version matches "
+            "the loco's parameter spec (check loco card from TC/shed records). "
+            "A card with wrong firmware will trigger this error on every MCE power-on. "
+            "If no recent card replacement: check VCI board parameter memory — "
+            "power surge or clock battery failure can corrupt stored parameters. "
+            "Resolution: parameter re-download via DDS software, or replacement of "
+            "the card with a correctly parameterised unit. "
+            "Do not reset repeatedly without investigating — "
+            "parameter mismatch can cause unexpected traction behaviour."
         ),
     },
 
