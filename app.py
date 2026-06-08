@@ -87,6 +87,23 @@ high_chains   = [r for r in sorted_results if getattr(r, "severity", "").upper()
 medium_chains = [r for r in sorted_results if getattr(r, "severity", "").upper() == "MEDIUM"]
 persisting    = [r for r in sorted_results if getattr(r, "outcome", "") == "PERSISTING"]
 
+# Compute uncaptured P1 count here so hero stats can show it
+_captured_keys = set()
+for r in sorted_results:
+    t = getattr(r, "trigger_text", "")
+    if t:
+        _captured_keys.add(t[:50])
+
+_uncaptured_p1 = []
+_seen_uc = set()
+if "Prio" in df.columns and "Dist Text" in df.columns:
+    for ev in df[df["Prio"] == 1]["Dist Text"].dropna().tolist():
+        key = ev[:50]
+        if key not in _captured_keys and key not in _seen_uc:
+            if not any(key[:30] in c for c in _captured_keys):
+                _seen_uc.add(key)
+                _uncaptured_p1.append(ev)
+
 if clock_fault:
     st.warning(
         f"⚠️ Clock anomaly on this loco: timestamps extend to {bad_year}. "
@@ -119,15 +136,66 @@ with hero_right:
     s1.metric("P1 Events",  p1_count)
     s2.metric("P2 Events",  p2_count)
     s3.metric("Total",      f"{total_events:,}")
-    st.caption(f"Sessions: {len(sessions_list)}  ·  Chains detected: {len(results)}")
+    st.caption(
+        f"Sessions: {len(sessions_list)}  ·  Chains detected: {len(results)}"
+        + (f"  ·  ⚠️ {len(_uncaptured_p1)} uncaptured P1 type{'s' if len(_uncaptured_p1)!=1 else ''}" if _uncaptured_p1 else "")
+    )
 
 st.divider()
 
-tab1, tab2, tab3, tab4 = st.tabs([
+# ── Enrich uncaptured P1s with date/count info ───────────────────────────────
+_uncaptured_p1_rich = []
+if _uncaptured_p1 and "Dist Text" in df.columns:
+    p1_df = df[df["Prio"] == 1].copy()
+    for ev in _uncaptured_p1:
+        matches = p1_df[p1_df["Dist Text"] == ev]
+        if matches.empty:
+            matches = p1_df[p1_df["Dist Text"].str.contains(ev[:40], na=False, regex=False)]
+        if not matches.empty:
+            times = matches["Start time"].dropna().sort_values()
+            _uncaptured_p1_rich.append({
+                "text":       ev,
+                "count":      len(matches),
+                "first":      times.iloc[0]  if len(times) > 0 else None,
+                "last":       times.iloc[-1] if len(times) > 0 else None,
+            })
+    # Sort by most recent first
+    _uncaptured_p1_rich.sort(
+        key=lambda x: x["last"] if x["last"] is not None else pd.Timestamp.min,
+        reverse=True
+    )
+
+uc_label = f"⚠️ Unmatched P1s ({len(_uncaptured_p1)})" if _uncaptured_p1 else "⚠️ Unmatched P1s"
+
+# ── Uncaptured P1 card renderer — defined at module level, not inside tab ────
+_UC_TOP_N    = 5
+_log_end_ts  = df["Start time"].max()
+
+def _render_uc_cards(items):
+    for item in items:
+        first_str = item["first"].strftime("%d-%b-%Y") if item["first"] else "—"
+        last_str  = item["last"].strftime("%d-%b-%Y")  if item["last"]  else "—"
+        is_recent = (
+            item["last"] is not None and
+            (_log_end_ts - item["last"]).days <= 14
+        )
+        badge = "🔴" if is_recent else "⚪"
+        with st.expander(f"{badge} {item['text'][:80]}", expanded=False):
+            c1, c2, c3 = st.columns(3)
+            c1.metric("Occurrences", item["count"])
+            c2.metric("First seen",  first_str)
+            c3.metric("Last seen",   last_str)
+            if is_recent:
+                st.caption("🔴 Active recently — check Raw Telemetry for full context.")
+            else:
+                st.caption("No matching fault chain defined. If this fault recurs, consider adding a chain.")
+
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
     "🔧 Shed Action Verdicts",
     "⏱️ Session Decomposition",
     "🔍 Raw Telemetry",
     "📄 Export Report",
+    uc_label,
 ])
 
 with tab1:
@@ -231,38 +299,15 @@ with tab1:
                         st.caption("**Diagnostic & Shed Procedure:**")
                         st.caption(action_text)
 
-        # ── Uncaptured P1 alerts ──────────────────────────────────────
-        # Any P1 event that didn't match a known chain — shown so nothing
-        # important is silently dropped.
-        if "Prio" in df.columns:
-            p1_events = df[df["Prio"] == 1]["Dist Text"].dropna().tolist()
-            # Collect all trigger texts already captured by chains
-            captured = set()
-            for r in sorted_results:
-                t = getattr(r, "trigger_text", "")
-                if t:
-                    captured.add(t[:50])
+        # ── Uncaptured P1 pointer ─────────────────────────────────────
+        if _uncaptured_p1:
+            st.divider()
+            st.caption(
+                f"⚠️ **{len(_uncaptured_p1)} unique P1 event type{'s' if len(_uncaptured_p1)>1 else ''}** "
+                f"fired but did not match any known fault chain — see the **{uc_label}** tab for details."
+            )
 
-            uncaptured = []
-            seen = set()
-            for ev in p1_events:
-                key = ev[:50]
-                if key not in captured and key not in seen:
-                    # Skip events that are sub-strings of captured triggers
-                    if not any(key[:30] in c for c in captured):
-                        seen.add(key)
-                        uncaptured.append(ev)
-
-            if uncaptured:
-                st.divider()
-                st.markdown("#### ⚠️ Uncaptured P1 Events")
-                st.caption(
-                    f"{len(uncaptured)} unique P1 event type{'s' if len(uncaptured)>1 else ''} "
-                    f"fired but did not match a known fault chain pattern. "
-                    f"Review manually in the Raw Telemetry tab."
-                )
-                for ev in uncaptured[:15]:
-                    st.caption(f"• {ev[:100]}")
+with tab2:
     st.caption("Hybrid power-cycle session detection — MCE ON events + fault-driven boundaries")
     st.text(session_coverage_report(sessions_list, df))
 
@@ -340,3 +385,17 @@ with tab3:
         df[cols].sort_values("Start time", ascending=False),
         use_container_width=True,
     )
+
+with tab5:
+    if not _uncaptured_p1_rich:
+        st.info("No uncaptured P1 events — all P1 faults matched a known chain.")
+    else:
+        st.caption(
+            f"{len(_uncaptured_p1_rich)} unique P1 event type{'s' if len(_uncaptured_p1_rich)>1 else ''} "
+            f"fired but did not match any known fault chain. "
+            f"Sorted by most recent occurrence. Use Raw Telemetry tab for full event detail."
+        )
+        _render_uc_cards(_uncaptured_p1_rich[:_UC_TOP_N])
+        if len(_uncaptured_p1_rich) > _UC_TOP_N:
+            with st.expander(f"Show remaining {len(_uncaptured_p1_rich) - _UC_TOP_N} events", expanded=False):
+                _render_uc_cards(_uncaptured_p1_rich[_UC_TOP_N:])
