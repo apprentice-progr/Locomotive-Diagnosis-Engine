@@ -256,6 +256,16 @@ CHAIN_EVIDENCE_HINTS: Dict[str, List[Tuple[str, float]]] = {
         ("Pressure switch No. 26 (pneumatic panel)",         0.30),
         ("MCB 48.1 in SB-2 (pantograph circuit breaker)",   0.25),
     ],
+    "BUR3_NO_OUTPUT": [
+        ("BUR3 inverter stage / gate driver card",           0.55),
+        ("MCB 127.22/3 in SB-2 (BUR3 circuit breaker)",     0.25),
+        ("BUR3 output voltage — check battery terminals",    0.20),
+    ],
+    "BUR2_INVERTER_FAULT": [
+        ("BUR2 inverter power stage card",                   0.55),
+        ("MCB 127.22/2 in SB-2 (BUR2 circuit breaker)",     0.25),
+        ("BUR2 gate driver — check Card 2000-139 area",      0.20),
+    ],
 }
 
 

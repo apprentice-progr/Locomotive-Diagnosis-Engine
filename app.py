@@ -231,7 +231,38 @@ with tab1:
                         st.caption("**Diagnostic & Shed Procedure:**")
                         st.caption(action_text)
 
-with tab2:
+        # ── Uncaptured P1 alerts ──────────────────────────────────────
+        # Any P1 event that didn't match a known chain — shown so nothing
+        # important is silently dropped.
+        if "Prio" in df.columns:
+            p1_events = df[df["Prio"] == 1]["Dist Text"].dropna().tolist()
+            # Collect all trigger texts already captured by chains
+            captured = set()
+            for r in sorted_results:
+                t = getattr(r, "trigger_text", "")
+                if t:
+                    captured.add(t[:50])
+
+            uncaptured = []
+            seen = set()
+            for ev in p1_events:
+                key = ev[:50]
+                if key not in captured and key not in seen:
+                    # Skip events that are sub-strings of captured triggers
+                    if not any(key[:30] in c for c in captured):
+                        seen.add(key)
+                        uncaptured.append(ev)
+
+            if uncaptured:
+                st.divider()
+                st.markdown("#### ⚠️ Uncaptured P1 Events")
+                st.caption(
+                    f"{len(uncaptured)} unique P1 event type{'s' if len(uncaptured)>1 else ''} "
+                    f"fired but did not match a known fault chain pattern. "
+                    f"Review manually in the Raw Telemetry tab."
+                )
+                for ev in uncaptured[:15]:
+                    st.caption(f"• {ev[:100]}")
     st.caption("Hybrid power-cycle session detection — MCE ON events + fault-driven boundaries")
     st.text(session_coverage_report(sessions_list, df))
 

@@ -789,6 +789,96 @@ CHAIN_LIBRARY = [
         ),
     },
 
+    # ------------------------------------------------------------------
+    # CHAIN 17: BUR3 No Output Frequency
+    # Observed in: IRPRP33586 (2 events), IRPRP33792 (3 events)
+    # ECode: 2014, EnvBl: EG_BUR3
+    # Mechanism: BUR3 auxiliary converter loses output frequency — 
+    #   internal hardware fault in BUR3 converter stage.
+    #   Distinct from lifesign loss (which is MVB communication dropout).
+    #   This is an internal BUR3 fault reported by BUR3 itself.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "BUR3_NO_OUTPUT",
+        "name":        "BUR3 Output Frequency Loss → Auxiliary Converter Fault",
+        "subsystem":   "Auxiliary Converter (BUR3)",
+        "dcu_aware":   False,
+        "max_window":  10,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR3:0021"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "No Output Frequency"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "auxiliary converter2 off"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Isolation demand SS07"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "BUR3 internal output frequency fault — not a communication/lifesign dropout. "
+            "ECode 2014 points to BUR3 converter stage hardware. "
+            "Check BUR3 rack (SB-2): inspect inverter stage and gate driver cards. "
+            "Check MCB 127.22/3 in SB-2. Verify BUR3 output voltage at battery terminals. "
+            "If BUR3 output voltage is zero after MCB reset: inverter card replacement required. "
+            "Do not confuse with BUR_LIFESIGN_LOSS — that is MVB communication loss, "
+            "this is an internal BUR3 hardware failure."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 18: BUR2 Inverter Fault → SS07 Isolation
+    # Observed in: IRPRP33792 (3 events, ECode 1501)
+    # Mechanism: BUR2 reports internal inverter fault → SS07 auxiliary
+    #   converter 2 shuts off. Internal BUR2 hardware failure, distinct
+    #   from the lifesign/MVB communication dropout pattern.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "BUR2_INVERTER_FAULT",
+        "name":        "BUR2 Inverter Fault → Auxiliary Converter 2 Isolation",
+        "subsystem":   "Auxiliary Converter (BUR2)",
+        "dcu_aware":   False,
+        "max_window":  10,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR2:0002"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Inverter fault"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "auxiliary converter2 off"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Isolation demand SS07"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "auxiliary converter2 off"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "BUR2 internal inverter fault (ECode 1501) — inverter stage hardware failure. "
+            "Check BUR2 rack in SB-2: inspect inverter power stage and gate driver cards. "
+            "Check MCB 127.22/2 in SB-2. Reset once after MCE OFF. "
+            "If fault recurs immediately on power-on: inverter card replacement required — "
+            "no recovery by reset. "
+            "Monitor battery charging after BUR2 isolation — below 86V converters switch off, "
+            "below 82V relief loco needed."
+        ),
+    },
+
 ]
 
 

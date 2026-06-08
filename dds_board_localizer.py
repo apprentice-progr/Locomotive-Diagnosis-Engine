@@ -719,6 +719,9 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "OHE_MVB_CASCADE":      "OHE-induced cascade — check DC link voltage recovery and MVB communication after OHE stabilises; no card replacement unless cascade persists after OHE clears",
         "VCB_STUCK_ON":         "Check VCB (pos. 5) armature, aux contacts, and pneumatic supply to trip coil — mechanical fault; check SPIF output only if VCB physically healthy",
         "PRECHARGE_OVERHEAT":   "Check precharge resistor condition and cooling airflow to converter — thermal fault; inspect Card 2000-138 area if resistor is healthy",
+        # New BUR internal hardware faults
+        "BUR3_NO_OUTPUT":       "BUR3 inverter stage hardware — check gate driver cards in BUR3 rack (SB-2); MCB 127.22/3",
+        "BUR2_INVERTER_FAULT":  "BUR2 inverter power stage — check gate driver cards in BUR2 rack (SB-2); MCB 127.22/2",
     }
 
     if bl.board_id == "UNKNOWN" or bl.confidence < 0.3:
