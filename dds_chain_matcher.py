@@ -1079,6 +1079,331 @@ CHAIN_LIBRARY = [
         ),
     },
 
+    # ------------------------------------------------------------------
+    # CHAIN 24: BUR Output Frequency / Inverter Fault (Internal Hardware)
+    # Confirmed on: 33586 (BUR3:0021 x2), 33792 (BUR3:0021 x3, BUR2:0002 x3)
+    # ECode 2014 (No Output Frequency), ECode 1501 (BUR Inverter Fault)
+    # EnvBl: EG_BUR3, EG_BUR2, EG_BUR1
+    # DISTINCT from BUR_LIFESIGN_LOSS:
+    #   - Lifesign loss = FLG can't see BUR on MVB → communication/fibre fault
+    #   - Output fault  = BUR is running but output is wrong/absent → internal
+    #     BUR hardware fault. Different card, different action.
+    # BUR3:0021 = no output frequency from BUR3 (charge converter section).
+    # BUR2:0002 = inverter fault inside BUR2 (drive electronics failed).
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "BUR_OUTPUT_FAULT",
+        "name":        "BUR Output / Inverter Fault (Internal Hardware)",
+        "subsystem":   "Auxiliary Converter (BUR Internal)",
+        "dcu_aware":   False,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "No Output Frequency"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR3:0021"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR2:0002"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR1:0002"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "2014"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "1501"},
+            {"match": "event",    "field": "Event Name",
+             "value": "BUR3_ENoOutFreq"},
+            {"match": "event",    "field": "Event Name",
+             "value": "BUR2_EInvFlt"},
+            {"match": "event",    "field": "Event Name",
+             "value": "BUR1_EInvFlt"},
+            {"match": "envbl",    "field": "EnvBl Id",
+             "value": "EG_BUR3"},
+            {"match": "envbl",    "field": "EnvBl Id",
+             "value": "EG_BUR2"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Lifesign from B"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS06 auxiliary converter1 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter2 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS08 auxiliary converter3 off"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "BUR internal output/inverter fault — NOT a communication fault. "
+            "Do not check fibre optic or Card 1302-1 first (that is for lifesign loss). "
+            "BUR3:0021 No Output Frequency: BUR3 charge converter section has failed internally. "
+            "BUR2:0002 Inverter fault: BUR2 drive electronics fault. "
+            "Identify which BUR from the event prefix (BUR1/BUR2/BUR3). "
+            "Isolate that BUR using its MCB: 127.22/1 (SB-1) for BUR1, "
+            "127.22/2 (SB-2) for BUR2, 127.22/3 (SB-2) for BUR3. "
+            "Inspect BUR card cage — check Card 1302-1 (control), Card 2000-140 "
+            "(battery charger control), and Card 1703 (thyristor driver). "
+            "BUR3 output fault specifically: check the output winding connections "
+            "before replacing cards — loose connection can cause spurious no-output reading. "
+            "If fault clears after MCE reset and does not recur: monitor. "
+            "If it fires on every power-on cycle: card replacement needed."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 25: HB-1 Busbar MCB Cluster (Multiple MCBs from same cubicle)
+    # Confirmed on: 33586 (CCUO:0117-0123, 7 MCBs all from HB-1, same dates)
+    # When 3+ MCBs from the same busbar (HB-1 or HB-2) trip on the same
+    #   session, this is NOT 7 independent faults. It is a single upstream
+    #   supply fault causing cascaded MCB trips across the busbar.
+    # If reset individually the fault WILL recur. Must identify upstream cause.
+    # Individual MCB codes: 0117 oil cooler blower, 0118 MR blower,
+    #   0119 TM1 blower, 0120 MR scav blower, 0121 conv1 pump/fan,
+    #   0122 transformer pump 1, 0123 scav oil cooler
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "HB1_MCB_CLUSTER",
+        "name":        "HB-1 Busbar MCB Cluster → Common Supply Fault",
+        "subsystem":   "Auxiliary Supply (HB-1 Busbar)",
+        "dcu_aware":   False,
+        "max_window":  60,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0117"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Oil cooler blower MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0118"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MR blower MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0119"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM 1 blower MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0120"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MR scav. blower MCB open"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0121"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Convert.1 pump or fan MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0122"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Transformer pump 1 MCB open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0123"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Scav. oil cooler MCB open"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS06"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Multiple MCBs from HB-1 busbar tripped — this is a busbar supply fault, "
+            "NOT individual blower/pump failures. "
+            "DO NOT reset individual MCBs one by one — they will all trip again. "
+            "Step 1: Check the main HB-1 busbar supply voltage (HBB1 cubicle, SB-1). "
+            "Step 2: Check the BUR output feeding HB-1 — if BUR output is low or absent "
+            "it will cause downstream MCB trips across the whole busbar. "
+            "Step 3: Check for earth fault on HB-1 wiring before resetting any MCB. "
+            "Measure insulation resistance on the HB-1 busbar section. "
+            "Step 4: Only after confirming supply voltage is healthy and no earth fault: "
+            "reset MCBs in sequence and observe which trips first — that is the actual fault. "
+            "If all hold after reset: the root cause was a transient supply dip (OHE or BUR). "
+            "Persistent re-trip after confirmed healthy supply: inspect motor windings "
+            "on the first MCB to trip."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 26: Pantograph Mechanical Bounce
+    # Confirmed on: 33586 (L:0790 x85 events), 33792 (L:0790 x64 events)
+    # ECode 303E (DCU1 panto), 403E (DCU2 panto)
+    # Event: D_PnBoL_CON18, D_PnBoL_CON28
+    # This is a MECHANICAL fault (pantograph spring/horn wear) not a card fault.
+    # High frequency bouncing causes OHE arcing, carbon contamination of VCB,
+    #   and intermittent traction loss. The M2HR consistently records this as
+    #   a persistent fault requiring panto maintenance.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "PANTO_BOUNCE",
+        "name":        "Pantograph Mechanical Bouncing → OHE Contact Loss",
+        "subsystem":   "Pantograph / OHE Interface (Mechanical)",
+        "dcu_aware":   False,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Pantograph bouncing"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "L:0790"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_PnBoL_CON18"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_PnBoL_CON28"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "303E"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "403E"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Primary voltage"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "OHE"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Catenary"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCE off - pan was down"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCB will not open"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MPV_EPgDown10Min"},
+        ],
+        "severity":    "MEDIUM",
+        "action":      (
+            "Pantograph bouncing — mechanical fault, not an electronics fault. "
+            "Inspect pantograph pan (carbon strip wear, spring tension, horn condition). "
+            "Check pantograph frame for loose joints or worn pivot bearings. "
+            "Check pan strip thickness — minimum 20mm, replace if less. "
+            "Inspect overhead contact wire condition at the section where bouncing occurs "
+            "(report to TRD if OHE stagger is excessive). "
+            "High frequency bouncing (20+ events per session): pan strip replacement needed "
+            "and pantograph spring tension check. "
+            "Secondary risk: repeated OHE arcing contaminates VCB contacts — "
+            "inspect VCB after persistent pantograph bouncing is resolved. "
+            "Loco can continue in service at reduced speed if VCB is healthy, "
+            "but schedule pantograph maintenance at next INSP."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 27: Line Converter HW Error / System Change Fault
+    # Confirmed on: 33792 (L:0834 HW error device, L:0852 system change
+    #   not successful, both on TC-2, 21-May, ECode 406D/407F)
+    # EnvBl: S_CvDgEnvGrL_2 (DCU2 line converter diagnostics group)
+    # L:0834 = hardware error on a device in the line converter
+    # L:0852 = system change command failed (firmware/parameter mismatch,
+    #   or hardware didn't respond to mode change during operation)
+    # These two appearing together on TC-2 same session = single root cause.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "LINE_CONV_HW_FAULT",
+        "name":        "Line Converter HW Error → System Change Failure",
+        "subsystem":   "Line Converter (DCU2 / TC-2)",
+        "dcu_aware":   True,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "L:0834"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "HW error device"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "406D"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "306D"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "L:0852"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "system change not successful"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "407F"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "307F"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Iso Request CON"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS01"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Line converter hardware fault (TC-2 / DCU2). "
+            "L:0834 HW error device: a hardware component in the DCU2 line converter "
+            "has responded with an error — typically a board-level fault. "
+            "L:0852 System change not successful: the line converter failed to complete "
+            "a mode transition (startup, regenerative braking, etc.). "
+            "These two appearing together = single hardware root cause. "
+            "Identify DCU origin: ECode prefix 3xxx=DCU1, 4xxx=DCU2. "
+            "Inspect line converter card cage on the identified DCU. "
+            "Check DCU2 connector integrity — intermittent connector faults cause "
+            "both HW errors and failed system changes. Reseat all connectors first. "
+            "If L:0852 appears after a card replacement: firmware version mismatch — "
+            "verify the replacement card matches the loco parameter spec. "
+            "If no recent replacement and connectors are clean: "
+            "check Line Converter Control board (CON2-A101) for damage."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 28: VCB Will Not Close → SS01 Supply Loss
+    # Complement to VCB_STUCK_ON (chain 2). That chain handles VCB stuck
+    #   in the OPEN position (won't open on command). This chain handles
+    #   VCB stuck in CLOSED position (won't close to restore supply).
+    # Observed from M2HR fleet analysis (8 occurrences across fleet).
+    # Different mechanical failure mode — different investigation procedure.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "VCB_NO_CLOSE",
+        "name":        "VCB Will Not Close → Main Power Supply Loss",
+        "subsystem":   "Main Power / VCB",
+        "dcu_aware":   False,
+        "max_window":  20,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCB will not close"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0115"},
+            {"match": "event",    "field": "Event Name",
+             "value": "MC_EMCBStkOff"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Primary voltage below minimum"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "OHE"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS01 main power off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCE off"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "VCB will not close — distinct from VCB stuck ON. "
+            "VCB is failing to CLOSE on command, not failing to open. "
+            "Check: (1) OHE voltage present at pantograph — if OHE is absent, "
+            "VCB correctly refuses to close. Check OHE status first. "
+            "(2) VCB pneumatic supply — closing coil requires adequate air pressure. "
+            "Check MR pressure (must be > 6 kg/cm²). "
+            "(3) VCB closing coil and associated relay — check SB-1 for coil fault. "
+            "(4) Interlock circuit — VCB won't close if earthing switch is in. "
+            "Check earthing switch (Pos. 8) is correctly withdrawn. "
+            "(5) If OHE present, MR healthy, and interlocks clear: "
+            "VCB closing mechanism is mechanically faulty — physical inspection required. "
+            "Do not attempt more than 3 closing attempts — repeated operation "
+            "of a faulty VCB risks coil burnout."
+        ),
+    },
+
 ]
 
 

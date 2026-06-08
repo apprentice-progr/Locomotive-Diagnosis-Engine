@@ -719,9 +719,20 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "OHE_MVB_CASCADE":      "OHE-induced cascade — check DC link voltage recovery and MVB communication after OHE stabilises; no card replacement unless cascade persists after OHE clears",
         "VCB_STUCK_ON":         "Check VCB (pos. 5) armature, aux contacts, and pneumatic supply to trip coil — mechanical fault; check SPIF output only if VCB physically healthy",
         "PRECHARGE_OVERHEAT":   "Check precharge resistor condition and cooling airflow to converter — thermal fault; inspect Card 2000-138 area if resistor is healthy",
-        # New BUR internal hardware faults
+        # BUR internal hardware faults
         "BUR3_NO_OUTPUT":       "BUR3 inverter stage hardware — check gate driver cards in BUR3 rack (SB-2); MCB 127.22/3",
         "BUR2_INVERTER_FAULT":  "BUR2 inverter power stage — check gate driver cards in BUR2 rack (SB-2); MCB 127.22/2",
+        "BUR_OUTPUT_FAULT":     "BUR internal hardware fault — check Card 1302-1 (control), Card 2000-140 (charger control), Card 1703 (thyristor driver) in affected BUR rack. Not a fibre/MVB fault.",
+        # System-level / mechanical faults for new chains
+        "HB1_MCB_CLUSTER":      "Check HB-1 busbar supply voltage and BUR output first — do NOT reset MCBs individually. Measure IR on HB-1 section before any resets.",
+        "PANTO_BOUNCE":         "Pantograph mechanical inspection — check pan strip thickness (min 20mm), spring tension, and pivot bearings. Not an electronics fault.",
+        "LINE_CONV_HW_FAULT":   "Reseat all DCU2 line converter card connectors first. Verify replacement card firmware if recent card swap. Check CON2-A101 if connectors clean.",
+        "VCB_NO_CLOSE":         "Check OHE voltage, MR pressure (>6 kg/cm²), and earthing switch position before suspecting VCB mechanism. Max 3 close attempts.",
+        "FUSE_415_110V":        "Locate and replace fuse F1/F2 in HBB1. If it blows again immediately: earth fault on 415V circuit — do NOT replace again, isolate and investigate.",
+        "EARTH_FAULT_CTRL":     "Megger test control circuit wiring in STB1/HBB1. IR < 1MΩ confirms earth fault. Do not return to service until IR confirmed healthy.",
+        "COMPRESSOR_MCB":       "Check compressor MCBs 47.1/1 (HB1) and 47.1/2 (HB2). Reset once only — if trips again do NOT reset. Check auto drain valves.",
+        "TRAFO_PUMP_MCB":       "Check transformer oil pump MCBs 62.1/1 (HB1) and 62.1/2 (HB2). Reset once only. Check oil level in expansion tanks.",
+        "DCU_PARAM_ERROR":      "Check if any card was recently replaced in CON1/CON2. If yes: verify firmware version matches loco spec. Re-download parameters via DDS if needed.",
     }
 
     if bl.board_id == "UNKNOWN" or bl.confidence < 0.3:
@@ -743,6 +754,11 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "MR_PRESSURE_BRAKE", "TRAFO_OIL", "COOLANT_FPGA",
         "FIRE_DETECT_PERSISTENT", "PANTO_MCE_OFF", "OHE_MVB_CASCADE",
         "VCB_STUCK_ON", "PRECHARGE_OVERHEAT",
+        # New system-level chains
+        "HB1_MCB_CLUSTER", "PANTO_BOUNCE", "LINE_CONV_HW_FAULT",
+        "VCB_NO_CLOSE", "FUSE_415_110V", "EARTH_FAULT_CTRL",
+        "COMPRESSOR_MCB", "TRAFO_PUMP_MCB", "DCU_PARAM_ERROR",
+        "BUR_OUTPUT_FAULT",
     }
 
     # chain_id is high-confidence evidence on its own — trust ATIL_CARD_MAP at >= 0.70

@@ -266,6 +266,57 @@ CHAIN_EVIDENCE_HINTS: Dict[str, List[Tuple[str, float]]] = {
         ("MCB 127.22/2 in SB-2 (BUR2 circuit breaker)",     0.25),
         ("BUR2 gate driver — check Card 2000-139 area",      0.20),
     ],
+    "BUR_OUTPUT_FAULT": [
+        ("Card 1302-1 — BUR main control board",             0.49),
+        ("Card 2000-140 — battery charger control",          0.22),
+        ("Fibre optic link FLG→BUR",                         0.16),
+        ("Coolant pump MCB",                                 0.13),
+    ],
+    "HB1_MCB_CLUSTER": [
+        ("HB-1 busbar supply voltage (check BUR output)",   0.50),
+        ("Earth fault on HB-1 section (megger test)",        0.30),
+        ("Individual MCB motor winding (after supply check)", 0.20),
+    ],
+    "PANTO_BOUNCE": [
+        ("Pantograph pan strip wear / spring tension",       0.55),
+        ("Pantograph pivot bearings / frame joints",         0.30),
+        ("OHE stagger / contact wire geometry (report TRD)", 0.15),
+    ],
+    "LINE_CONV_HW_FAULT": [
+        ("DCU2 line converter card connector (reseat first)", 0.45),
+        ("Replacement card firmware mismatch (check version)", 0.35),
+        ("Line Converter Control board CON2-A101",           0.20),
+    ],
+    "VCB_NO_CLOSE": [
+        ("VCB mechanical closing mechanism (pos. 5)",        0.50),
+        ("VCB closing coil / relay in SB-1",                 0.30),
+        ("MR pressure or OHE — check before VCB mechanism", 0.20),
+    ],
+    "FUSE_415_110V": [
+        ("Fuse F1/F2 in HBB1 (415V/110V auxiliary supply)", 0.65),
+        ("Earth fault on 415V circuit (if fuse blows again)", 0.25),
+        ("Auxiliary motor winding (shorted load)",           0.10),
+    ],
+    "EARTH_FAULT_CTRL": [
+        ("Control circuit wiring harness in HBB1/STB1",     0.55),
+        ("Control circuit contactors / relay coils",         0.30),
+        ("Connector corrosion / moisture ingress",           0.15),
+    ],
+    "COMPRESSOR_MCB": [
+        ("Compressor MCB 47.1/1 (HB1) or 47.1/2 (HB2)",    0.55),
+        ("Auto drain valve / air dryer (leakage path)",      0.30),
+        ("Compressor motor fault (do not reset repeatedly)", 0.15),
+    ],
+    "TRAFO_PUMP_MCB": [
+        ("Transformer oil pump MCB 62.1/1 (HB1) or 62.1/2 (HB2)", 0.55),
+        ("Pump motor bearing / winding (seized or shorted)", 0.30),
+        ("Oil level in expansion tanks (low = increased load)", 0.15),
+    ],
+    "DCU_PARAM_ERROR": [
+        ("Replacement card firmware version mismatch",       0.55),
+        ("VCI board parameter memory (check after power surge)", 0.30),
+        ("Parameter re-download via DDS software",           0.15),
+    ],
 }
 
 
