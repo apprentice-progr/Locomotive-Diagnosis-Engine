@@ -876,6 +876,13 @@ def annotate_chains(results, df_full):
             "trigger_board":      trigger_board,
             "graduated_guidance": guidance,
             "pcb_suspect":        pcb,
+            # Evidence trail for "Why this verdict?" UI — shows exact data fields used
+            "evidence": {
+                "ecode":      str(trigger_rows.iloc[0].get("ECode 0",   "—")).strip() if not trigger_rows.empty else "—",
+                "envbl":      str(trigger_rows.iloc[0].get("EnvBl Id",  "—")).strip() if not trigger_rows.empty else "—",
+                "event_name": str(trigger_rows.iloc[0].get("Event Name","—")).strip() if not trigger_rows.empty else "—",
+                "source":     trigger_board.source if trigger_board else "no trigger row matched",
+            },
         }
 
     return annotations

@@ -292,6 +292,27 @@ with tab1:
                     if getattr(r, "trigger_text", None):
                         st.markdown(f"**Root cause event:** `{r.trigger_text}`")
 
+                    # ── Why this verdict? ─────────────────────────────────
+                    # Shows the exact data fields that drove localisation —
+                    # for presentation/defence: "the tool concluded X because..."
+                    evidence   = ann.get("evidence", {}) if ann else {}
+                    ev_ecode   = evidence.get("ecode",      "—")
+                    ev_envbl   = evidence.get("envbl",      "—")
+                    ev_evname  = evidence.get("event_name", "—")
+                    ev_source  = evidence.get("source",     "")
+                    if ev_source and ev_source not in ("—", "none", "no trigger row matched"):
+                        st.divider()
+                        st.caption("**Why this verdict?**")
+                        st.caption(f"🔢 **ECode 0:** `{ev_ecode}`")
+                        st.caption(f"🗂️ **EnvBl Id:** `{ev_envbl}`")
+                        if ev_evname and ev_evname not in ("—", "nan", "None", ""):
+                            st.caption(f"📋 **Event Name:** `{ev_evname}`")
+                        st.caption(f"🧠 **Localisation basis:** _{ev_source}_")
+                        st.caption(
+                            "Source: Bombardier FFM 3EH-214057-0001 §6.3.3.9 "
+                            "(processor disturbance forms) + observed DDS data"
+                        )
+
                     # Diagnostic procedure — always visible, muted style
                     action_text = getattr(r, "action", None) or getattr(r, "description", "")
                     if action_text:
