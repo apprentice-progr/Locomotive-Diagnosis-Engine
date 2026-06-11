@@ -216,6 +216,47 @@ ECODE_BOARD_MAP: Dict[str, dict] = {
     "20":   {"board_id": "BUR3_INT",   "description": "BUR3 internal fault (aux converter)",
              "part_ref": "EG_BUR3",    "replaces": "BUR3 rack inspection — Card 1302-1 or inverter",
              "confidence": 0.92},
+
+    # ── Traction motor temperature / sensor — CON1/CON2 3-digit event codes ─
+    # ECode 313/314/315 = TM 1/2/3 Too Hot (bogie 1 when in CON1 space)
+    # ECode 307–312 = Motor temperature sensor missing or implausible
+    "313":  {"board_id": "DCUM1_1",   "description": "Traction Motor 1 Overheat — Motor Conv 1 (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM1 board if blower healthy",
+             "confidence": 0.88},
+    "314":  {"board_id": "DCUM2_1",   "description": "Traction Motor 2 Overheat — Motor Conv 2 (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM2 board if blower healthy",
+             "confidence": 0.88},
+    "315":  {"board_id": "DCUM3_1",   "description": "Traction Motor 3 Overheat — Motor Conv 3 (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM3 board if blower healthy",
+             "confidence": 0.88},
+    "307":  {"board_id": "DCUM1_1",   "description": "TM1 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check TM1 sensor wiring; replace CON1-A605-A02 if wiring intact",
+             "confidence": 0.82},
+    "308":  {"board_id": "DCUM2_1",   "description": "TM2 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check TM2 sensor wiring; replace CON1-A607-A01 if wiring intact",
+             "confidence": 0.82},
+    "309":  {"board_id": "DCUM3_1",   "description": "TM3 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check TM3 sensor wiring; replace CON1-A607-A02 if wiring intact",
+             "confidence": 0.82},
+    "310":  {"board_id": "DCUM1_1",   "description": "TM1 temp sensor implausible — redundant sensors differ (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check TM1 sensor wiring; replace CON1-A605-A02 if wiring intact",
+             "confidence": 0.82},
+    "311":  {"board_id": "DCUM2_1",   "description": "TM2 temp sensor implausible (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check TM2 sensor wiring; replace CON1-A607-A01 if wiring intact",
+             "confidence": 0.82},
+    "312":  {"board_id": "DCUM3_1",   "description": "TM3 temp sensor implausible (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check TM3 sensor wiring; replace CON1-A607-A02 if wiring intact",
+             "confidence": 0.82},
+
+    # ── VCI parameter store — AMP parameter change error ───────────────────
+    # 514E/514F sit inside the "51" SPIF prefix but point to VCI parameter memory.
+    # Exact 4-char match takes priority over prefix, giving the right guidance.
+    "514E": {"board_id": "VCI_PARAM",  "description": "VCI parameter store — AMP parameter change error (DCU1)",
+             "part_ref": "CON1-VCI",   "replaces": "Re-download parameters via DDS; verify replacement card firmware matches loco spec",
+             "confidence": 0.88},
+    "514F": {"board_id": "VCI_PARAM",  "description": "VCI parameter store — AMP parameter change error (DCU2)",
+             "part_ref": "CON2-VCI",   "replaces": "Re-download parameters via DDS; verify replacement card firmware matches loco spec",
+             "confidence": 0.88},
 }
 
 # ---------------------------------------------------------------------------
@@ -733,6 +774,14 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "COMPRESSOR_MCB":       "Check compressor MCBs 47.1/1 (HB1) and 47.1/2 (HB2). Reset once only — if trips again do NOT reset. Check auto drain valves.",
         "TRAFO_PUMP_MCB":       "Check transformer oil pump MCBs 62.1/1 (HB1) and 62.1/2 (HB2). Reset once only. Check oil level in expansion tanks.",
         "DCU_PARAM_ERROR":      "Check if any card was recently replaced in CON1/CON2. If yes: verify firmware version matches loco spec. Re-download parameters via DDS if needed.",
+        # Chains 29–35: new in chain matcher update
+        "CCUO_LIFESIGN_LOSS":   "Check MCB 127.22/5 (CCUO1 power supply) in SB-1. If MCB holds: check fibre optic FLG→CCUO1 and CCUO1 card cage LEDs. Do not run with CCUO1 absent — brake interlock is compromised.",
+        "BUR_CURRENT_SENSOR":   "Reseat SLG1 current transducer connector in the affected BUR output circuit first. If fault recurs on next power-on: replace SLG1 transducer. Not a power electronics fault.",
+        "LINE_VOLT_OUT_OF_RANGE": "Check whether other locos on the same OHE section report the same fault. If yes: infrastructure issue — report to TRD. If loco-specific: check 2A OHE fuse (SB-1) and primary voltage sensor calibration.",
+        "HARMONIC_FILTER_FAULT":  "SS04 harmonic filter isolated — loco limited to 40 km/h. Earth fault in filter: megger test capacitor bank before any reset. Current signal loss: check SLG transducer connectors first. Do not attempt SS04 reset repeatedly in field.",
+        "TRACTION_MOTOR_OVERHEAT": "Check TM blower MCB 53.1/1 (HB1 Bogie1) or 53.1/2 (HB2 Bogie2). Reset MCB once after VCB open. If MCB trips again: DO NOT reset — isolate bogie via switch 154 (SB-1) and limp to shed. This is a cooling fault, not necessarily a winding fault.",
+        "MOTOR_TEMP_SENSOR_FAULT": "Per FFM F0204P2/F0304P2: normal operation can continue (Prio 2). Check motor temperature sensor wiring at next INSP. Replace DCU2/M board (CON1-A605-A02/A607-A01/A607-A02) only if wiring is intact and fault persists.",
+        "TM_MOTOR_ISOLATED":      "Acknowledge with BPFA and resume if transient speed sensor issue. Check DDS for preceding overtemperature or DSP blocking events before condemning motor. If MCB 53.1/1 or 53.1/2 trips: isolate BUR-II (MCB 127.22/2 SB-2) — unbalanced BUR output can cause TM blower MCB trips leading to isolation.",
     }
 
     if bl.board_id == "UNKNOWN" or bl.confidence < 0.3:
@@ -759,6 +808,10 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "VCB_NO_CLOSE", "FUSE_415_110V", "EARTH_FAULT_CTRL",
         "COMPRESSOR_MCB", "TRAFO_PUMP_MCB", "DCU_PARAM_ERROR",
         "BUR_OUTPUT_FAULT",
+        # Chains 29–35 (system/sensor/mechanical actions, not single-card replacements)
+        "CCUO_LIFESIGN_LOSS", "BUR_CURRENT_SENSOR", "LINE_VOLT_OUT_OF_RANGE",
+        "HARMONIC_FILTER_FAULT", "TRACTION_MOTOR_OVERHEAT",
+        "MOTOR_TEMP_SENSOR_FAULT", "TM_MOTOR_ISOLATED",
     }
 
     # chain_id is high-confidence evidence on its own — trust ATIL_CARD_MAP at >= 0.70

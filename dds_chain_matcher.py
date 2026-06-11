@@ -1404,6 +1404,525 @@ CHAIN_LIBRARY = [
         ),
     },
 
+    # ------------------------------------------------------------------
+    # CHAIN 29: CCUO1 Lifesign Loss
+    # Fleet M2HR: 15 occurrences across fleet.
+    # CCUO (Central Control Unit for On-board systems) processor comms
+    # failure — FLG can no longer see CCUO1 on the MVB bus.
+    # Distinct from BUR lifesign: CCUO handles cab signals, brake
+    # electronics, and VCB interlock logic. Loss causes immediate P1
+    # and can mask brake faults.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "CCUO_LIFESIGN_LOSS",
+        "name":        "CCUO1 Lifesign Loss → Control Bus Fault",
+        "subsystem":   "Vehicle Control (CCUO1 / FLG Bus)",
+        "dcu_aware":   False,
+        "max_window":  20,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0139"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Lifesign from CCUO1 missing"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Lifesign from CCUO2 missing"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Brake electronics"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCB will not"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS01 main power off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "MCE off"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "CCUO1 lifesign missing — FLG processor can no longer communicate with CCUO1. "
+            "CCUO handles cab control signals, brake electronics interface, and VCB interlock. "
+            "Loss of CCUO lifesign can mask brake faults and prevent VCB operation. "
+            "Step 1: Check MCB 127.22/5 (CCUO1 power supply) in SB-1. Reset once. "
+            "Step 2: If MCB holds: check fibre optic cable FLG→CCUO1. "
+            "Step 3: Check CCUO1 card cage for power LED status. "
+            "Step 4: If CCUO1 restored: verify brake electronics and VCB respond normally "
+            "before returning loco to service. "
+            "If CCUO1 lifesign loss is persistent (every power-on): card replacement needed. "
+            "Do not attempt line running with CCUO1 absent — brake interlock is compromised."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 30: BUR Current Signal Loss (SLG1)
+    # Fleet M2HR: 16 occurrences — CCUO:0221 BUR No current signal Ch 1 SLG1
+    # SLG1 = current transducer channel 1 in BUR output circuit.
+    # This is a sensor fault, not a power electronics fault.
+    # The BUR continues to run but the control system loses feedback
+    # on output current, triggering a protective isolation.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "BUR_CURRENT_SENSOR",
+        "name":        "BUR Current Signal Loss (SLG1) → Aux Converter Isolated",
+        "subsystem":   "Auxiliary Converter (BUR Current Transducer)",
+        "dcu_aware":   False,
+        "max_window":  25,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0221"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR No current signal"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "No current signal Ch 1 SLG"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0286"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0287"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Filter current No signal SLG"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "auxiliary converter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS08"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS07 auxiliary converter2 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS08 auxiliary converter3 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS06 auxiliary converter1 off"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "BUR current transducer (SLG1) signal loss — NOT a power electronics fault. "
+            "The BUR hardware is likely intact; the current feedback sensor has failed. "
+            "CCUO:0221 = BUR output current transducer channel 1 lost signal. "
+            "CCUO:0286/0287 = filter circuit current transducer signal lost. "
+            "Step 1: Identify which BUR by checking EnvBl prefix (EG_BUR1/2/3). "
+            "Step 2: Locate SLG1 current transducer in that BUR's output circuit. "
+            "Step 3: Check transducer connector and wiring — vibration-induced connector "
+            "loosening is the most common cause. Reseat connector first. "
+            "Step 4: If reseating resolves the fault on reset: apply locktite to connector. "
+            "Step 5: If fault recurs on next power-on: SLG1 transducer replacement needed. "
+            "The BUR can be run with one current channel in some configurations — "
+            "check with TC before deciding to run through or isolate."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 31: Line Voltage Out of Range During Operation
+    # Fleet M2HR: 18 occurrences — L:0860
+    # Fires during operation (not at startup) when OHE voltage falls
+    # outside the permissible operating band. Different from OHE_MVB_CASCADE
+    # (voltage drop → DC link → MVB cascade). This is a sustained
+    # out-of-range voltage that doesn't trigger a cascade but reduces
+    # performance and stresses traction components.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "LINE_VOLT_OUT_OF_RANGE",
+        "name":        "Line Voltage Out of Range During Operation",
+        "subsystem":   "OHE / Main Power Supply",
+        "dcu_aware":   False,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "L:0860"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Line volt. out of range during oper"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0198"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Catenary Voltage out of Limits"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Primary voltage"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "DC link"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCB will not open"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS01 main power off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Primary voltage below minimum"},
+        ],
+        "severity":    "MEDIUM",
+        "action":      (
+            "Line voltage out of operating range — OHE voltage too high or too low "
+            "during operation (L:0860), or catenary voltage outside limits (CCUO:0198). "
+            "This is primarily an infrastructure issue unless it recurs on one loco only. "
+            "Step 1: Check whether other locos on the same OHE section report the same fault "
+            "at the same time — if yes, report to TRD for OHE investigation. "
+            "Step 2: If only this loco: check 2A OHE fuse in SB-1. "
+            "Step 3: Check primary voltage sensor calibration — a faulty sensor gives "
+            "false out-of-range readings even on healthy OHE. "
+            "Step 4: If voltage fluctuation is confirmed but OHE is healthy: "
+            "check pantograph contact quality — intermittent contact causes voltage spikes "
+            "that trigger L:0860 and can precede a VCB trip. "
+            "If occurring at a specific route section: raise PWAY/OHE complaint."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 32: Harmonic Filter Fault → SS04 Isolated
+    # Fleet M2HR: 15 occurrences — ICP1-085 / CCUO:0081 / CCUO:0092
+    # The harmonic filter suppresses OHE current harmonics. When it
+    # faults, SS04 is isolated and loco speed is limited to 40 km/h.
+    # CCUO:0081 = Disturbance in filter
+    # CCUO:0092 = SS04 harmonic filter isolated
+    # CCUO:0126 = Earth fault filter circuit (26 occurrences — related)
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "HARMONIC_FILTER_FAULT",
+        "name":        "Harmonic Filter Fault → SS04 Isolated (40 km/h limit)",
+        "subsystem":   "Harmonic Filter (SS04)",
+        "dcu_aware":   True,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0081"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Disturbance in filter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "ICP1-085"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "FLG1:0085"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0126"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Earth fault filter circuit"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "HBB1:0014"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0286"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Filter current No signal"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Filter current>maximum"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "DCU1-023"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS04"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "harmonic filter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "filter contactor"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0092"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS04 harmonic filter"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "ICP1-096"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "harmonic filter isolated"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Harmonic filter fault — SS04 isolated. Loco is limited to 40 km/h "
+            "in this condition to limit harmonic injection into the OHE. "
+            "CCUO:0081 / ICP1-085 Disturbance in filter: filter component fault. "
+            "CCUO:0126 / HBB1:0014 Earth fault filter circuit: insulation breakdown "
+            "in filter wiring or capacitor bank — safety-critical, IR test required. "
+            "CCUO:0286/0287 Filter current No signal: current transducer lost. "
+            "Step 1: Identify fault type from the DDS message above. "
+            "Step 2: Earth fault in filter: megger test filter capacitor bank and wiring. "
+            "Do NOT run at normal speed until IR confirmed healthy. "
+            "Step 3: Disturbance in filter: check filter capacitor bank for bulging/damage. "
+            "Check filter contactor (52/1 or 52/2) operation. "
+            "Step 4: Current signal loss: check SLG current transducer connectors in "
+            "filter circuit before replacing transducer. "
+            "SS04 isolated loco can run at 40 km/h to base for investigation — "
+            "do not attempt SS04 reset repeatedly in field."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 33: Traction Motor Temperature Too High → Bogie Isolation
+    # FFM Source: F0207P1 (SS02), F0307P1 (SS03) — Section 5.3.2, 5.3.3
+    # Confirmed real DDS trigger: M1:0378-FPGA caused PS (ECode 31BA/41BA)
+    # Also fires via Blocking by DSP (M1:0377, M2:0550, M3:0723) on
+    # multiple motors simultaneously — indicates converter protection.
+    # Protection: blocks converter, may isolate bogie.
+    # Driver action per FFM: check MCB 53.1/1 (TMB-1 HB1) for Bogie1,
+    #                        check MCB 53.1/2 (TMB-2 HB2) for Bogie2.
+    # NOTE: The ECode for FPGA-caused PS is 31BA/41BA in real logs,
+    # NOT 313/314/315 — those are theoretical CON1 event codes that
+    # do not appear in practice. Triggers reflect observed data.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "TRACTION_MOTOR_OVERHEAT",
+        "name":        "Traction Motor Temperature Too High → Bogie May Isolate",
+        "subsystem":   "Traction Bogie (SS02/SS03 — TM Cooling)",
+        "dcu_aware":   True,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Traction Motor 1 too hot"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Traction Motor 2 too hot"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Traction Motor 3 too hot"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "F0207P1"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "F0307P1"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TRACTION MOTOR TEMPERATURE"},
+            {"match": "event",    "field": "Event Name",
+             "value": "CON1_313"},
+            {"match": "event",    "field": "Event Name",
+             "value": "CON1_314"},
+            {"match": "event",    "field": "Event Name",
+             "value": "CON1_315"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0044"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0045"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Temp. difference motors Bg"},
+            # Real DDS format confirmed from fleet logs: M1:0378-FPGA caused PS
+            # ECodes 31BA (DCU1/M1) and 41BA (DCU2/M1) — both bogies
+            {"match": "contains", "field": "Dist Text",
+             "value": "M1:0378-FPGA caused PS"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "31BA"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "41BA"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_PrSdByFpgaM1"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Converter 1 blocked"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Converter 2 blocked"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS02"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS03"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "BOGIE 1 ISOLATED"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BOGIE 2 ISOLATED"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS02 traction bogie1 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS03 traction bogie2 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0212"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0215"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Traction motor temperature too high — FFM F0207P1/F0307P1 (Section 5.3.2/5.3.3). "
+            "Converter is blocked. Bogie may get isolated if temperature does not recover. "
+            "Step 1: Bring throttle to 0. Clear block section. "
+            "Step 2: Identify bogie side — ECodes 31BA/CON15 = Bogie1 (DCU1), "
+            "41BA/CON25 = Bogie2 (DCU2). "
+            "Step 3: Check TM blower manually — inspect air suction at TM Louver. "
+            "For Bogie1: check MCB 53.1/1 in HB1. For Bogie2: check MCB 53.1/2 in HB2. "
+            "If MCB found tripped: open VCB and reset MCB once. "
+            "Step 4: If MCB trips again — DO NOT reset. Isolate concerned bogie using "
+            "switch 154 (SB-1). Work with one bogie at reduced TE. "
+            "Step 5: If MCB was not tripped but blower not running: Switch OFF/ON electronics, "
+            "raise panto, close VCB, try to resume traction. "
+            "Step 6: If temperature normalises and no further overtemperature: "
+            "BUR-II isolation (MCB 127.22/2 in SB-2) may help — try if bogie isolation persists. "
+            "Inform TLC and record DDS in logbook. "
+            "Note: This is a cooling system fault, not necessarily a motor winding fault. "
+            "Do not condemn the motor until blower, MCB, and cooling airflow are confirmed healthy."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 34: Faulty Motor Temperature Sensors
+    # FFM Source: F0204P2 (SS02), F0304P2 (SS03) — Section 5.3.2, 5.3.3
+    # DDS triggers: CON1:307-312 (no temp / implausible)
+    # EC = 032 (Class B — disturbance, no direct effect)
+    # Driver action per FFM: "Normal operation can continue. To be checked
+    #   during maintenance." Prio 2 — no bogie isolation, informational.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "MOTOR_TEMP_SENSOR_FAULT",
+        "name":        "Motor Temperature Sensor Fault → Maintenance Check",
+        "subsystem":   "Traction Motor Sensor (CON1/CON2 — DCU2/M)",
+        "dcu_aware":   True,
+        "max_window":  20,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.1 no Temp"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.2 no Temp"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.3 no Temp"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.1 Temp. implaus"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.2 Temp. implaus"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Trac. Mot.3 Temp. implaus"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "FAULTY MOTOR TEMPERATURE SENSORS"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "F0204P2"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "F0304P2"},
+        ],
+        "propagation": [],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS02 traction bogie1 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS03 traction bogie2 off"},
+        ],
+        "severity":    "MEDIUM",
+        "action":      (
+            "Motor temperature sensor fault — FFM F0204P2/F0304P2, Priority 2. "
+            "Per FFM: normal operation can continue. No bogie isolation from this fault alone. "
+            "The temperature measurement for the affected motor is invalid — "
+            "if temperature actually rises, no warning will fire until sensor is fixed. "
+            "Identify motor from Dist Text prefix (Trac. Mot.1/2/3). "
+            "Shed action at next INSP or M2HR: "
+            "Step 1: Check motor temperature sensor wiring for the identified motor. "
+            "Per FFM: sensor open-circuit, short-circuit, or temperature difference between "
+            "two redundant sensors > limit. "
+            "Step 2: Replace motor temperature sensor if wiring is intact. "
+            "Per FFM: replace DCU2/M card (CON1-A605-A02 for M1, CON1-A607-A01 for M2, "
+            "CON1-A607-A02 for M3) if sensor replacement does not resolve. "
+            "Do not defer if loco is operating in high ambient temperature conditions — "
+            "absent temperature sensing increases risk of undetected overheating."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN 35: Traction Motor / Bogie Isolation
+    # FFM Source: F0208P2-F0210P2 (SS02), F0308P2-F0310P2 (SS03)
+    #   VCI:0074 = TM1-Bogie1 isolated, VCI:0075 = TM2, VCI:0076 = TM3
+    #   VCI:0077 = TM1-Bogie2, VCI:0078 = TM2, VCI:0079 = TM3
+    # EC = 032 (Class B), Prio 2 — reduced TE/BE, not full shutdown
+    # CCUO:0212/213/214 = TM1/2/3 isolated Bogie1
+    # CCUO:0215/216/217 = TM1/2/3 isolated Bogie2
+    #
+    # DATA-DRIVEN CORRECTIONS (from fleet log analysis):
+    # - Torque reduction events (D_MRcXLimAvM3, D_MRcILimAvM1, etc.) are
+    #   NORMAL operational events fired continuously during traction — they
+    #   are NOT fault signals. Removed from trigger/propagation entirely.
+    # - "Blocking by DSP" events (M1:0377, M2:0550, M3:0723) are legitimate
+    #   protection responses but fire in many normal scenarios — kept only
+    #   in propagation (not trigger) with a tight max_window.
+    # - Actual isolation events are rare and use CCUO:0212-0217 / VCI:0074-0079.
+    # - max_window reduced to 3 min: real motor isolation events fire within
+    #   seconds of their preceding fault context.
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "TM_MOTOR_ISOLATED",
+        "name":        "Traction Motor Isolated → Reduced TE/BE",
+        "subsystem":   "Traction Motor (CON1/CON2 — VCI Isolation)",
+        "dcu_aware":   True,
+        "max_window":  3,
+        "trigger": [
+            # VCI motor isolation confirmation codes — definitive triggers
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0074"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0075"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0076"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0077"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0078"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "VCI:0079"},
+            # CCUO motor isolation codes (confirmed in real DDS exports)
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0212"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0213"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0214"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0215"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0216"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0217"},
+            # Display text variants confirmed in real exports
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM1-Bogie 1 isolated"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM2-Bogie 1 isolated"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM3-Bogie 1 isolated"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM1-Bogie 2 isolated"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM2-Bogie 2 isolated"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "TM3-Bogie 2 isolated"},
+        ],
+        # NOTE: Torque reduction events (D_MRcXLim, D_MRcILim, D_MRcHghDcLk, etc.)
+        # are NORMAL operational events and must NOT appear here.
+        # "Blocking by DSP" is retained as propagation only — it is a genuine
+        # protection event but too common to be a trigger alone.
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Blocking by DSP"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_DspBcAvM1"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_DspBcAvM2"},
+            {"match": "event",    "field": "Event Name",
+             "value": "D_DspBcAvM3"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS02 traction bogie1 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SS03 traction bogie2 off"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BOGIE 1 ISOLATED"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BOGIE 2 ISOLATED"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Traction motor isolated — FFM F0208-F0210P2/F0308-F0310P2, VCI:0074-0079. "
+            "One or more motors on a bogie have been isolated by the protection system. "
+            "Reduced TE/BE available — loco can continue with remaining motors. "
+            "Per FFM: driver action is to acknowledge with BPFA and resume normal operation. "
+            "Inform TLC and record in logbook. "
+            "FFM identified causes (per DDS form 6.3.3.1, VCI:0074-0079): "
+            "(1) Temporary speed sensor problem — most common, often self-clears on next power-on. "
+            "(2) CON1-Mx software problem. "
+            "(3) CON1-Mx hardware problem. "
+            "Shed investigation: check DDS for preceding events before isolation — "
+            "if motor temperature events precede isolation, follow TRACTION_MOTOR_OVERHEAT action. "
+            "If DSP blocking events (0723/0377/0550) precede isolation, check converter cooling. "
+            "If isolated without any preceding fault: likely transient speed sensor problem. "
+            "Per FFM SS06/07/08 general instruction: if MCB 53.1/1 or 53.1/2 trips repeatedly, "
+            "isolate BUR-II (MCB 127.22/2 in SB-2) — unbalanced BUR output can cause MCB trips "
+            "on TM blowers which then lead to motor overtemperature and isolation. "
+            "Do not attempt to identify motor winding fault without first ruling out "
+            "speed sensor and cooling path as causes."
+        ),
+    },
+
 ]
 
 
