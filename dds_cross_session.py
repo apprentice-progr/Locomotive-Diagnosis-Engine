@@ -502,6 +502,7 @@ class CrossSessionTracker:
                     action           = chain_def.get("action", ""),
                     cross_session    = False,
                     outcome          = "SAME_SESSION",
+                    session_type     = session_type,
                 )
                 self.closed_chains.append(cr)
 
