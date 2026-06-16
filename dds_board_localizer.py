@@ -736,6 +736,7 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         "EARTH_FAULT_CTRL":     "Megger test control circuit wiring in STB1/HBB1. IR < 1MΩ confirms earth fault. Do not return to service until IR confirmed healthy.",
         "COMPRESSOR_MCB":       "Check compressor MCBs 47.1/1 (HB1) and 47.1/2 (HB2). Reset once only — if trips again do NOT reset. Check auto drain valves.",
         "TRAFO_PUMP_MCB":       "Check transformer oil pump MCBs 62.1/1 (HB1) and 62.1/2 (HB2). Reset once only. Check oil level in expansion tanks.",
+        "TRAFO_OIL_BOTH":      "Both oil circuits disturbed — check pump MCBs 62.1/1 and 62.1/2, blower MCBs 59.1/1 and 59.1/2, and BUR output voltage. Do not reset without identifying root cause.",
         "DCU_PARAM_ERROR":      "Check if any card was recently replaced in CON1/CON2. If yes: verify firmware version matches loco spec. Re-download parameters via DDS if needed.",
         "PRIMARY_OVERCURRENT":  "Check OHE and correlate with other locos before suspecting hardware. If recurrent: inspect line converter IGBTs and OCR-78 relay contacts in SB-1.",
         "SPEEDOMETER_FAULT":    "Check speed sensor wiring and connector at axle box first — not a card fault unless wiring confirmed healthy.",
@@ -763,7 +764,7 @@ def graduated_guidance(bl: BoardLocalisation, chain_id: str = "") -> str:
         # New system-level chains
         "HB1_MCB_CLUSTER", "PANTO_BOUNCE", "LINE_CONV_HW_FAULT",
         "VCB_NO_CLOSE", "FUSE_415_110V", "EARTH_FAULT_CTRL",
-        "COMPRESSOR_MCB", "TRAFO_PUMP_MCB", "DCU_PARAM_ERROR",
+        "COMPRESSOR_MCB", "TRAFO_PUMP_MCB", "TRAFO_OIL_BOTH", "DCU_PARAM_ERROR",
         "BUR_OUTPUT_FAULT", "PRIMARY_OVERCURRENT", "SPEEDOMETER_FAULT",
     }
 

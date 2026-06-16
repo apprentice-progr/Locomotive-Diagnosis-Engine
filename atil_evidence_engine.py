@@ -312,6 +312,12 @@ CHAIN_EVIDENCE_HINTS: Dict[str, List[Tuple[str, float]]] = {
         ("Pump motor bearing / winding (seized or shorted)", 0.30),
         ("Oil level in expansion tanks (low = increased load)", 0.15),
     ],
+    "TRAFO_OIL_BOTH": [
+        ("Transformer oil pump MCBs 62.1/1 and 62.1/2 (both)",  0.45),
+        ("BUR output voltage imbalance (upstream cause)",        0.30),
+        ("Oil cooler blower MCBs 59.1/1 and 59.1/2",           0.15),
+        ("Transformer oil level — expansion tank min/max",       0.10),
+    ],
     "DCU_PARAM_ERROR": [
         ("Replacement card firmware version mismatch",       0.55),
         ("VCI board parameter memory (check after power surge)", 0.30),

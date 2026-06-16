@@ -1106,10 +1106,14 @@ CHAIN_LIBRARY = [
              "value": "BUR2:0002"},
             {"match": "contains", "field": "Dist Text",
              "value": "BUR1:0002"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "BUR3:0002"},
             {"match": "ecode",    "field": "ECode 0",
              "value": "2014"},
             {"match": "ecode",    "field": "ECode 0",
              "value": "1501"},
+            {"match": "ecode",    "field": "ECode 0",
+             "value": "1502"},
             {"match": "event",    "field": "Event Name",
              "value": "BUR3_ENoOutFreq"},
             {"match": "event",    "field": "Event Name",
@@ -1150,6 +1154,55 @@ CHAIN_LIBRARY = [
             "before replacing cards — loose connection can cause spurious no-output reading. "
             "If fault clears after MCE reset and does not recur: monitor. "
             "If it fires on every power-on cycle: card replacement needed."
+        ),
+    },
+
+    # ------------------------------------------------------------------
+    # CHAIN: TRAFO_OIL_BOTH
+    # Standalone trigger for CCUO:0082 — both trafo oil circuits disturbed.
+    # Distinct from TRAFO_OIL (one circuit, temperature trip) and
+    # TRAFO_PUMP_MCB (MCB open precursor). Fires when both circuits fail
+    # simultaneously without the single-circuit precursor being logged first.
+    # Confirmed on IRPRP37602 (12-Apr-2026, manual register).
+    # ------------------------------------------------------------------
+    {
+        "chain_id":    "TRAFO_OIL_BOTH",
+        "name":        "Both Transformer Oil Circuits Disturbed → Emergency Shutdown",
+        "subsystem":   "Transformer Cooling Circuit",
+        "dcu_aware":   False,
+        "max_window":  30,
+        "trigger": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "CCUO:0082"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "Dist. both trafo oil circuits"},
+        ],
+        "propagation": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "trafo oil"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "temperature"},
+        ],
+        "terminal": [
+            {"match": "contains", "field": "Dist Text",
+             "value": "Power Off MCE"},
+            {"match": "contains", "field": "Dist Text",
+             "value": "SPIF"},
+        ],
+        "severity":    "HIGH",
+        "action":      (
+            "Both transformer oil circuits disturbed simultaneously — more serious than "
+            "single circuit fault. Both oil pumps or both oil cooler blower circuits have "
+            "failed or tripped. "
+            "Step 1: Check both pump MCBs 62.1/1 (HB1) and 62.1/2 (HB2) — if both tripped, "
+            "check for earth fault on oil pump busbar before resetting. "
+            "Step 2: Check both oil cooler blower MCBs 59.1/1 and 59.1/2. "
+            "Step 3: Check BUR output voltage — simultaneous failure of both circuits often "
+            "indicates an upstream BUR output fault causing both HB-1 and HB-2 supply loss. "
+            "Step 4: Check transformer oil level in expansion tanks — critically low oil level "
+            "can cause thermal protection on both circuits to trigger simultaneously. "
+            "Do NOT reset and run until root cause is identified — running without adequate "
+            "transformer cooling risks transformer winding damage."
         ),
     },
 
