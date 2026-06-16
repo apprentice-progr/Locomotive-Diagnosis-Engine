@@ -76,15 +76,30 @@ with st.spinner("Running diagnostic pipeline…"):
 
 SEV_WEIGHT = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 
+# Sessions that represent unscheduled/testing activity rather than real line
+# operation. A HIGH severity chain firing during one of these should not
+# outrank a real fault from OPERATIONAL or FAULT_ACTIVE running.
+TEST_SESSION_TYPES = {"TEST", "IDLE"}
+
 def _sort_key(chain):
     sev = SEV_WEIGHT.get(getattr(chain, "severity", "HIGH").upper(), 3)
-    t   = getattr(chain, "trigger_time", None) or pd.Timestamp.min
-    return (sev, -int(t.timestamp()))
+    is_test = getattr(chain, "session_type", "") in TEST_SESSION_TYPES
+    # Demote test/idle-session faults below all real-session faults of the
+    # same severity tier, but keep them above the next severity tier down
+    # only as a tiebreak — i.e. (severity, is_test, recency).
+    t = getattr(chain, "trigger_time", None) or pd.Timestamp.min
+    return (sev, 1 if is_test else 0, -int(t.timestamp()))
 
 sorted_results = sorted(results, key=_sort_key)
 
-high_chains   = [r for r in sorted_results if getattr(r, "severity", "").upper() == "HIGH"]
-medium_chains = [r for r in sorted_results if getattr(r, "severity", "").upper() == "MEDIUM"]
+high_chains   = [r for r in sorted_results
+                 if getattr(r, "severity", "").upper() == "HIGH"
+                 and getattr(r, "session_type", "") not in TEST_SESSION_TYPES]
+medium_chains = [r for r in sorted_results
+                 if getattr(r, "severity", "").upper() == "MEDIUM"
+                 and getattr(r, "session_type", "") not in TEST_SESSION_TYPES]
+test_session_chains = [r for r in sorted_results
+                        if getattr(r, "session_type", "") in TEST_SESSION_TYPES]
 persisting    = [r for r in sorted_results if getattr(r, "outcome", "") == "PERSISTING"]
 
 # Compute uncaptured P1 count here so hero stats can show it
@@ -127,6 +142,13 @@ with hero_left:
         st.warning(
             f"**{len(high_chains)} HIGH priority chain{'s' if len(high_chains)>1 else ''}** · "
             f"{len(medium_chains)} MEDIUM"
+        )
+    if test_session_chains:
+        st.info(
+            f"ℹ️ {len(test_session_chains)} chain"
+            f"{'s' if len(test_session_chains)>1 else ''} fired during TEST/IDLE "
+            f"sessions (unscheduled inspection or workshop testing) — shown lower "
+            f"in the list below, not counted as line-operation faults."
         )
     if not results:
         st.success("No fault chains detected in this log.")
@@ -219,12 +241,23 @@ with tab1:
             b_desc    = getattr(tb, "description", "")        if tb else ""
             b_rep     = getattr(tb, "replaces",    "")        if tb else ""
 
+            sess_type   = getattr(r, "session_type", "")
+            is_test_sess = sess_type in TEST_SESSION_TYPES
+
             sev_icon    = "🔴" if severity == "HIGH" else "🟡" if severity == "MEDIUM" else "🟢"
             board_tag   = f"→ {b_id}" if b_id not in ("UNKNOWN", "") else ""
             persist_tag = " 🔁 PERSISTING" if outcome == "PERSISTING" else ""
-            label       = f"{sev_icon} {name}  {board_tag}{persist_tag}"
+            test_tag    = f" 🧪 {sess_type} SESSION" if is_test_sess else ""
+            label       = f"{sev_icon} {name}  {board_tag}{persist_tag}{test_tag}"
 
-            with st.expander(label, expanded=(i <= 3)):
+            with st.expander(label, expanded=(i <= 3 and not is_test_sess)):
+                if is_test_sess:
+                    st.caption(
+                        f"🧪 **This fault occurred during a {sess_type} session** "
+                        f"(unscheduled inspection, workshop testing, or idle period) — "
+                        f"not during normal line operation. Confidence reduced accordingly."
+                    )
+
                 action_col, context_col = st.columns([4, 4])
 
                 atil = _atil_engine.process_chain(

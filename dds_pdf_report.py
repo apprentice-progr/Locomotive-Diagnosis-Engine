@@ -107,8 +107,13 @@ def _build_action_report(buf, vehicle, log_start, log_end,
     ))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_LGRAY, spaceAfter=6))
 
-    high   = [r for r in sorted_results if getattr(r, "severity", "").upper() == "HIGH"]
-    medium = [r for r in sorted_results if getattr(r, "severity", "").upper() == "MEDIUM"]
+    _TEST_SESSION_TYPES = {"TEST", "IDLE"}
+    high   = [r for r in sorted_results
+              if getattr(r, "severity", "").upper() == "HIGH"
+              and getattr(r, "session_type", "") not in _TEST_SESSION_TYPES]
+    medium = [r for r in sorted_results
+              if getattr(r, "severity", "").upper() == "MEDIUM"
+              and getattr(r, "session_type", "") not in _TEST_SESSION_TYPES]
     persis = [r for r in sorted_results if getattr(r, "outcome", "") == "PERSISTING"]
 
     summary_data = [
@@ -154,12 +159,14 @@ def _build_action_report(buf, vehicle, log_start, log_end,
 
         sev_col = _sev_color(severity)
         persist_note = "  [PERSISTING ACROSS SESSIONS]" if outcome == "PERSISTING" else ""
+        sess_type = getattr(r, "session_type", "")
+        test_note = f"  [{sess_type} SESSION — not line operation]" if sess_type in ("TEST", "IDLE") else ""
 
         block = []
 
         # Chain header row
         header_data = [[
-            Paragraph(f"<b>{i}. {name}{persist_note}</b>", S["Body"]),
+            Paragraph(f"<b>{i}. {name}{persist_note}{test_note}</b>", S["Body"]),
             Paragraph(f"<font color='#{sev_col.hexval()[2:]}'>&#9679;</font> {severity}",
                       S["Body"]),
             Paragraph(f"`{chain_id}`", S["Mono"]),
