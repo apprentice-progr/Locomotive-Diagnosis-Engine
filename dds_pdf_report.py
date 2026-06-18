@@ -107,7 +107,8 @@ def _build_action_report(buf, vehicle, log_start, log_end,
     ))
     story.append(HRFlowable(width="100%", thickness=0.5, color=C_LGRAY, spaceAfter=6))
 
-    _TEST_SESSION_TYPES = {"TEST", "IDLE"}
+    _TEST_SESSION_TYPES = set()  # was {"TEST", "IDLE"} — see dds_cross_session.py
+                                  # SESSION_CONFIDENCE_WEIGHT for the reasoning.
     high   = [r for r in sorted_results
               if getattr(r, "severity", "").upper() == "HIGH"
               and getattr(r, "session_type", "") not in _TEST_SESSION_TYPES]

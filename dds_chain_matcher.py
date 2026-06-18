@@ -1669,9 +1669,55 @@ def _find_first_match(df, conditions):
     return None, None
 
 
+def _find_all_distinct_triggers(df, conditions, collapse_window_min):
+    """
+    Return a list of (index, row) for every trigger occurrence in df that is
+    NOT just burst/duplicate logging of an already-counted occurrence.
+
+    A session can legitimately contain the same trigger condition firing more
+    than once — e.g. HB1_MCB_CLUSTER recurring on four different shed visits
+    weeks apart within one long TEST session. The naive "first match only"
+    approach silently drops every occurrence after the first, regardless of
+    how far apart they are. At the same time, several subsystems log the same
+    physical event multiple times within the same second or two (sub-minute
+    chatter), so a literal "every hit is a new occurrence" approach would
+    flood the output with near-duplicate entries.
+
+    We split the difference: walk all matching rows in chronological order,
+    and only start a new occurrence once the gap since the last *accepted*
+    occurrence's trigger time exceeds collapse_window_min. Hits inside that
+    window are treated as the same physical incident (the chain's own
+    propagation/terminal logic already looks within max_window for those).
+    """
+    hits = df[df.apply(lambda row: _matches_any(row, conditions), axis=1)]
+    if hits.empty:
+        return []
+
+    hits = hits.sort_values("Start time")
+    collapse_window = pd.Timedelta(minutes=collapse_window_min)
+
+    accepted = []
+    last_t = None
+    for idx, row in hits.iterrows():
+        t = row["Start time"]
+        if last_t is None or (t - last_t) > collapse_window:
+            accepted.append((idx, row))
+            last_t = t
+        # else: within collapse_window of the last accepted trigger —
+        # treat as duplicate/burst logging of the same incident, not a new one.
+    return accepted
+
+
 def match_chains(session_df, chain_library):
     """
     Attempt to match all chains against a session DataFrame.
+
+    A chain's trigger condition can legitimately recur more than once within
+    a single session (sessions can span many hours or, for TEST/IDLE
+    sessions, several days). Each distinct (non-burst) recurrence is matched
+    and scored independently, so a real fault that happens to repeat in the
+    same session is not silently merged into — or dropped behind — its
+    first occurrence.
 
     Returns a list of match dicts with timing and confidence.
     """
@@ -1683,101 +1729,102 @@ def match_chains(session_df, chain_library):
         if not chain.get("trigger"):
             continue
 
-        # Find trigger event
-        trig_idx, trig_row = _find_first_match(session_df, chain["trigger"])
-        if trig_idx is None:
-            continue
+        collapse_window_min = chain["max_window"]
+        trigger_hits = _find_all_distinct_triggers(
+            session_df, chain["trigger"], collapse_window_min
+        )
 
-        t_trigger = trig_row["Start time"]
-        window    = pd.Timedelta(minutes=chain["max_window"])
-        window_df = session_df[
-            (session_df["Start time"] >= t_trigger) &
-            (session_df["Start time"] <= t_trigger + window)
-        ]
-
-        # Check propagation
-        prop_hits  = []
-        for cond in chain.get("propagation", []):
-            idx, row = _find_first_match(window_df, [cond])
-            if idx is not None:
-                prop_hits.append({
-                    "text": row["Dist Text"],
-                    "time": row["Start time"],
-                    "lag_min": round(
-                        (row["Start time"] - t_trigger).total_seconds() / 60, 1
-                    ),
-                })
-
-        # Check terminal
-        term_hits = []
-        for cond in chain.get("terminal", []):
-            idx, row = _find_first_match(window_df, [cond])
-            if idx is not None:
-                term_hits.append({
-                    "text": row["Dist Text"],
-                    "time": row["Start time"],
-                    "lag_min": round(
-                        (row["Start time"] - t_trigger).total_seconds() / 60, 1
-                    ),
-                })
-
-        # Confidence scoring
-        # Trigger alone = 0.3, each prop step = +0.2, each terminal = +0.25
-        # Cap at 1.0
-        confidence = 0.3
-        confidence += min(len(prop_hits) * 0.2, 0.4)
-        confidence += min(len(term_hits) * 0.25, 0.5)
-        confidence = round(min(confidence, 1.0), 2)
-
-        # DCU origination
-        dcu_origin = None
-        if chain.get("dcu_aware"):
-            ecode = str(trig_row.get("ECode 0", "")).strip()
-            if ecode.startswith("3"):
-                dcu_origin = "DCU1"
-            elif ecode.startswith("4"):
-                dcu_origin = "DCU2"
-
-        # Deterministic check: same fault fires repeatedly within session
-        is_deterministic = False
-        if chain.get("deterministic_check"):
-            repeat_df = session_df[
-                session_df["Dist Text"] == trig_row["Dist Text"]
+        for trig_idx, trig_row in trigger_hits:
+            t_trigger = trig_row["Start time"]
+            window    = pd.Timedelta(minutes=chain["max_window"])
+            window_df = session_df[
+                (session_df["Start time"] >= t_trigger) &
+                (session_df["Start time"] <= t_trigger + window)
             ]
-            if len(repeat_df) >= 2:
-                lags = repeat_df["Start time"].diff().dt.total_seconds().dropna()
-                if lags.std() < 30:  # < 30 sec std dev = deterministic
-                    is_deterministic = True
 
-        # Intermittent hardware flag
-        is_intermittent = False
-        for kw in chain.get("intermittent_flag", []):
-            if session_df["Dist Text"].str.contains(kw, na=False).any():
-                is_intermittent = True
-                break
+            # Check propagation
+            prop_hits  = []
+            for cond in chain.get("propagation", []):
+                idx, row = _find_first_match(window_df, [cond])
+                if idx is not None:
+                    prop_hits.append({
+                        "text": row["Dist Text"],
+                        "time": row["Start time"],
+                        "lag_min": round(
+                            (row["Start time"] - t_trigger).total_seconds() / 60, 1
+                        ),
+                    })
 
-        # Persistence check (fire detection etc.)
-        is_persistent = False
-        persistence_days = 0
-        if chain.get("persistence_check"):
-            is_persistent = True   # the caller (process_file) will compute days
+            # Check terminal
+            term_hits = []
+            for cond in chain.get("terminal", []):
+                idx, row = _find_first_match(window_df, [cond])
+                if idx is not None:
+                    term_hits.append({
+                        "text": row["Dist Text"],
+                        "time": row["Start time"],
+                        "lag_min": round(
+                            (row["Start time"] - t_trigger).total_seconds() / 60, 1
+                        ),
+                    })
 
-        matches.append({
-            "chain_id":        chain["chain_id"],
-            "name":            chain["name"],
-            "subsystem":       chain["subsystem"],
-            "severity":        chain["severity"],
-            "confidence":      confidence,
-            "trigger_text":    trig_row["Dist Text"],
-            "trigger_time":    t_trigger,
-            "propagation_hits": prop_hits,
-            "terminal_hits":   term_hits,
-            "dcu_origin":      dcu_origin,
-            "is_deterministic": is_deterministic,
-            "is_intermittent": is_intermittent,
-            "is_persistent":   is_persistent,
-            "action":          chain["action"],
-        })
+            # Confidence scoring
+            # Trigger alone = 0.3, each prop step = +0.2, each terminal = +0.25
+            # Cap at 1.0
+            confidence = 0.3
+            confidence += min(len(prop_hits) * 0.2, 0.4)
+            confidence += min(len(term_hits) * 0.25, 0.5)
+            confidence = round(min(confidence, 1.0), 2)
+
+            # DCU origination
+            dcu_origin = None
+            if chain.get("dcu_aware"):
+                ecode = str(trig_row.get("ECode 0", "")).strip()
+                if ecode.startswith("3"):
+                    dcu_origin = "DCU1"
+                elif ecode.startswith("4"):
+                    dcu_origin = "DCU2"
+
+            # Deterministic check: same fault fires repeatedly within session
+            is_deterministic = False
+            if chain.get("deterministic_check"):
+                repeat_df = session_df[
+                    session_df["Dist Text"] == trig_row["Dist Text"]
+                ]
+                if len(repeat_df) >= 2:
+                    lags = repeat_df["Start time"].diff().dt.total_seconds().dropna()
+                    if lags.std() < 30:  # < 30 sec std dev = deterministic
+                        is_deterministic = True
+
+            # Intermittent hardware flag
+            is_intermittent = False
+            for kw in chain.get("intermittent_flag", []):
+                if session_df["Dist Text"].str.contains(kw, na=False).any():
+                    is_intermittent = True
+                    break
+
+            # Persistence check (fire detection etc.)
+            is_persistent = False
+            persistence_days = 0
+            if chain.get("persistence_check"):
+                is_persistent = True   # the caller (process_file) will compute days
+
+            matches.append({
+                "chain_id":        chain["chain_id"],
+                "name":            chain["name"],
+                "subsystem":       chain["subsystem"],
+                "severity":        chain["severity"],
+                "confidence":      confidence,
+                "trigger_text":    trig_row["Dist Text"],
+                "trigger_time":    t_trigger,
+                "propagation_hits": prop_hits,
+                "terminal_hits":   term_hits,
+                "dcu_origin":      dcu_origin,
+                "is_deterministic": is_deterministic,
+                "is_intermittent": is_intermittent,
+                "is_persistent":   is_persistent,
+                "action":          chain["action"],
+            })
 
     # Sort by severity then confidence
     sev_order = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2, "LOW": 3}

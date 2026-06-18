@@ -93,8 +93,10 @@ SESSION_CONFIDENCE_WEIGHT = {
     "FAULT_ACTIVE":    1.0,
     "INVESTIGATION":   1.0,
     "OPERATIONAL":     0.8,
-    "TEST":            0.6,
-    "IDLE":            0.2,
+    "TEST":            1.0,   # was 0.6 — a matched chain already carries its own
+                               # FFM/ECode/ATIL evidence; a co-occurring test/shunting
+                               # keyword elsewhere in the session shouldn't discount it.
+    "IDLE":            1.0,   # was 0.2 — same reasoning.
     "INCOMPLETE":      0.7,
     "UNKNOWN":         0.7,
 }

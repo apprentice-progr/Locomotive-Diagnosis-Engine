@@ -79,7 +79,9 @@ SEV_WEIGHT = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
 # Sessions that represent unscheduled/testing activity rather than real line
 # operation. A HIGH severity chain firing during one of these should not
 # outrank a real fault from OPERATIONAL or FAULT_ACTIVE running.
-TEST_SESSION_TYPES = {"TEST", "IDLE"}
+TEST_SESSION_TYPES = set()  # was {"TEST", "IDLE"} — session_type is still recorded
+                             # and visible per-chain; it no longer suppresses or
+                             # demotes a chain that already matched on its own evidence.
 
 def _sort_key(chain):
     sev = SEV_WEIGHT.get(getattr(chain, "severity", "HIGH").upper(), 3)
@@ -101,6 +103,52 @@ medium_chains = [r for r in sorted_results
 test_session_chains = [r for r in sorted_results
                         if getattr(r, "session_type", "") in TEST_SESSION_TYPES]
 persisting    = [r for r in sorted_results if getattr(r, "outcome", "") == "PERSISTING"]
+
+# ── Group occurrences by distinct fault type ─────────────────────────────────
+# A single chain_id (e.g. PANTO_BOUNCE, HB1_MCB_CLUSTER) can have many
+# occurrences across the log period — each a real, independently-verified
+# recurrence, not noise (see dds_chain_matcher's burst-collapse fix). But a
+# technician scanning the verdict list wants "is panto bounce a problem on
+# this loco" once, not eight separate cards for the same fault type. So the
+# main list shows one card per chain_id — the most recent occurrence — with
+# every earlier occurrence still available, just folded underneath rather
+# than competing for top-billing.
+#
+# Nothing about detection, counting, or confidence changes here: this is
+# purely how sorted_results gets laid out on screen.
+
+def _group_by_chain_id(chain_list):
+    """
+    Group a list of chain results by chain_id. Returns a list of dicts:
+    {"chain_id", "representative": most-recent r, "all": [r, ...] sorted
+    most-recent-first, "count": n}, sorted by (severity, recency of the
+    representative) — i.e. the same ordering _sort_key already gives the
+    flat list, just collapsed to one row per fault type.
+    """
+    groups = {}
+    for r in chain_list:
+        cid = getattr(r, "chain_id", getattr(r, "name", "UNKNOWN"))
+        groups.setdefault(cid, []).append(r)
+
+    grouped = []
+    for cid, occurrences in groups.items():
+        occurrences_sorted = sorted(
+            occurrences,
+            key=lambda r: getattr(r, "trigger_time", None) or pd.Timestamp.min,
+            reverse=True,
+        )
+        grouped.append({
+            "chain_id":       cid,
+            "representative": occurrences_sorted[0],
+            "all":            occurrences_sorted,
+            "count":          len(occurrences_sorted),
+        })
+
+    grouped.sort(key=lambda g: _sort_key(g["representative"]))
+    return grouped
+
+grouped_results = _group_by_chain_id(sorted_results)
+
 
 # Compute uncaptured P1 count here so hero stats can show it
 _captured_keys = set()
@@ -139,9 +187,12 @@ with hero_left:
             + ("…" if len(persisting) > 3 else "")
         )
     if high_chains:
+        n_high_types = sum(1 for g in grouped_results if g["representative"] in high_chains)
+        n_med_types  = sum(1 for g in grouped_results if g["representative"] in medium_chains)
         st.warning(
-            f"**{len(high_chains)} HIGH priority chain{'s' if len(high_chains)>1 else ''}** · "
-            f"{len(medium_chains)} MEDIUM"
+            f"**{n_high_types} HIGH priority fault type{'s' if n_high_types!=1 else ''}** "
+            f"({len(high_chains)} occurrence{'s' if len(high_chains)!=1 else ''}) · "
+            f"{n_med_types} MEDIUM"
         )
     if test_session_chains:
         st.info(
@@ -224,7 +275,11 @@ with tab1:
     if not sorted_results:
         st.info("No fault chains detected.")
     else:
-        for i, r in enumerate(sorted_results, 1):
+        for i, g in enumerate(grouped_results, 1):
+            r         = g["representative"]
+            n_occ     = g["count"]
+            earlier   = g["all"][1:]   # everything except the representative itself
+
             severity  = getattr(r, "severity", "HIGH").upper()
             chain_id  = getattr(r, "chain_id",  "UNKNOWN")
             name      = getattr(r, "name",      chain_id)
@@ -248,9 +303,19 @@ with tab1:
             board_tag   = f"→ {b_id}" if b_id not in ("UNKNOWN", "") else ""
             persist_tag = " 🔁 PERSISTING" if outcome == "PERSISTING" else ""
             test_tag    = f" 🧪 {sess_type} SESSION" if is_test_sess else ""
-            label       = f"{sev_icon} {name}  {board_tag}{persist_tag}{test_tag}"
+            recur_tag   = f"  ·  ↻ {n_occ}× recorded" if n_occ > 1 else ""
+            label       = f"{sev_icon} {name}  {board_tag}{persist_tag}{test_tag}{recur_tag}"
 
             with st.expander(label, expanded=(i <= 3 and not is_test_sess)):
+                if n_occ > 1:
+                    first_seen = g["all"][-1].trigger_time
+                    last_seen  = g["all"][0].trigger_time
+                    st.caption(
+                        f"↻ **Recorded {n_occ} times** in this log "
+                        f"({first_seen.strftime('%d-%b-%Y') if first_seen else '—'} "
+                        f"→ {last_seen.strftime('%d-%b-%Y') if last_seen else '—'}). "
+                        f"Showing most recent occurrence below; earlier ones listed at the bottom."
+                    )
                 if is_test_sess:
                     st.caption(
                         f"🧪 **This fault occurred during a {sess_type} session** "
@@ -352,6 +417,23 @@ with tab1:
                         st.divider()
                         st.caption("**Diagnostic & Shed Procedure:**")
                         st.caption(action_text)
+
+                # ── Earlier occurrences of this same fault type ───────────
+                if earlier:
+                    st.divider()
+                    with st.expander(
+                        f"↻ {len(earlier)} earlier occurrence{'s' if len(earlier)!=1 else ''} "
+                        f"of this fault", expanded=False
+                    ):
+                        for er in earlier:
+                            er_sess   = getattr(er, "session_type", "")
+                            er_test   = " 🧪" if er_sess in TEST_SESSION_TYPES else ""
+                            er_time   = getattr(er, "trigger_time", None)
+                            er_time_s = er_time.strftime("%d-%b-%Y  %H:%M:%S") if er_time else "—"
+                            er_out    = getattr(er, "outcome", "UNKNOWN")
+                            st.caption(
+                                f"`{er_time_s}`  ·  {er_out}  ·  conf {getattr(er, 'confidence', 0):.2f}{er_test}"
+                            )
 
         # ── Uncaptured P1 pointer ─────────────────────────────────────
         if _uncaptured_p1:
