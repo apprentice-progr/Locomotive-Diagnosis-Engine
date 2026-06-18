@@ -178,6 +178,73 @@ SYMPTOM_COMPONENT_MAP: List[Tuple[str, List[Tuple[str, float]]]] = [
          ("VCB auxiliary contact feedback wiring",       0.30),
          ("VCB pneumatic supply (aux reservoir pressure)", 0.20),
      ]),
+
+    # -- Traction motor overtemperature ---------------------------------
+    # Source: FFM F0207P1/F0307P1, CON1:313-315 events
+    (r"Traction Motor.*too hot|CON[12]:31[345]|TRACTION MOTOR TEMPERATURE|"
+     r"F020[78]P[12]|F030[78]P[12]|M[123]:0378|FPGA caused PS.*motor|"
+     r"Temp.*difference.*motors",
+     [
+         ("TM blower MCB 53.1/1 or 53.1/2",              0.55),
+         ("TM blower motor / airflow restriction",        0.25),
+         ("BUR-II output balance (unbalanced -> MCB trips)", 0.20),
+     ]),
+
+    # -- Motor temperature sensor fault ----------------------------------
+    # Source: FFM F0204P2/F0304P2, CON1:307-312
+    (r"Trac\.?\s*Mot\.[123]\s*no Temp|Trac\.?\s*Mot\.[123]\s*Temp\.\s*implaus|"
+     r"FAULTY MOTOR TEMPERATURE|F0204P2|F0304P2|CON[12]:30[7-9]|CON[12]:31[012]",
+     [
+         ("Motor temperature sensor wiring",              0.55),
+         ("DCU2/M board A605-A02 / A607-A01 / A607-A02", 0.30),
+         ("Motor temperature sensor element",             0.15),
+     ]),
+
+    # -- Traction motor isolated (VCI:0074-0079) --------------------------
+    (r"VCI:007[4-9]|TM[123]-Bogie [12] isolated|MOTOR [123]\s+ISOLATED BOGIE|"
+     r"CCUO:021[2-7]",
+     [
+         ("Speed sensor / speed sensor wiring (most common)", 0.50),
+         ("TM blower MCB / cooling path",                 0.30),
+         ("CON1/CON2 motor converter board",              0.20),
+     ]),
+
+    # -- CCUO lifesign loss -------------------------------------------------
+    (r"Lifesign from CCUO[12] missing|CCUO:0139",
+     [
+         ("MCB 127.22/5 -- CCUO1 power supply MCB",        0.50),
+         ("Fibre optic FLG->CCUO1",                        0.30),
+         ("CCUO1 processor card",                         0.20),
+     ]),
+
+    # -- BUR current sensor loss ---------------------------------------------
+    (r"BUR No current signal|No current signal Ch 1 SLG|Filter current No signal|"
+     r"CCUO:022[16]|CCUO:028[67]",
+     [
+         ("SLG1 current transducer connector (reseat first)", 0.60),
+         ("SLG1 current transducer replacement",          0.30),
+         ("BUR output circuit wiring",                    0.10),
+     ]),
+
+    # -- Harmonic filter fault -------------------------------------------------
+    (r"Disturbance in filter|SS04 harmonic filter|Earth fault filter circuit|"
+     r"Filter current.*maximum|ICP1-085|ICP1-096|CCUO:0081|CCUO:0092|CCUO:0126|"
+     r"HBB1:0014|DCU1-023",
+     [
+         ("Filter capacitor bank (check bulging/damage)",  0.40),
+         ("SLG current transducer in filter circuit",      0.30),
+         ("Filter contactor 52/1 or 52/2",                0.20),
+         ("Filter wiring insulation (megger if earth fault)", 0.10),
+     ]),
+
+    # -- Line voltage out of range during operation ----------------------------
+    (r"Line volt\. out of range|L:0860|CCUO:0198|Catenary Voltage out of Limits",
+     [
+         ("OHE infrastructure -- check with other locos on section", 0.50),
+         ("2A OHE fuse in SB-1",                          0.25),
+         ("Primary voltage sensor calibration",           0.15),
+         ("Pantograph contact quality / OHE stagger",     0.10),
+     ]),
 ]
 
 
@@ -332,6 +399,44 @@ CHAIN_EVIDENCE_HINTS: Dict[str, List[Tuple[str, float]]] = {
         ("Speed sensor wiring / connector (axle box)",       0.50),
         ("Speed sensor air gap / mounting clearance",        0.30),
         ("VCI speed signal processing circuit",              0.20),
+    ],
+    # Chains 29-35
+    "CCUO_LIFESIGN_LOSS": [
+        ("MCB 127.22/5 — CCUO1 power supply MCB (SB-1)",    0.50),
+        ("Fibre optic cable FLG→CCUO1",                      0.30),
+        ("CCUO1 processor card / card cage",                 0.20),
+    ],
+    "BUR_CURRENT_SENSOR": [
+        ("SLG1 current transducer — connector reseating first", 0.60),
+        ("SLG1 transducer replacement (if connector OK)",    0.30),
+        ("BUR output circuit wiring vibration damage",       0.10),
+    ],
+    "LINE_VOLT_OUT_OF_RANGE": [
+        ("OHE infrastructure / catenary (report TRD if fleet-wide)", 0.50),
+        ("2A OHE fuse in SB-1",                              0.25),
+        ("Primary voltage sensor calibration",               0.15),
+        ("Pantograph contact quality (if loco-specific)",    0.10),
+    ],
+    "HARMONIC_FILTER_FAULT": [
+        ("Filter capacitor bank (check for bulging/damage)", 0.40),
+        ("SLG current transducer in filter circuit (connector first)", 0.30),
+        ("Filter contactor 52/1 or 52/2",                   0.20),
+        ("Filter wiring insulation (megger if earth fault)",  0.10),
+    ],
+    "TRACTION_MOTOR_OVERHEAT": [
+        ("TM blower MCB 53.1/1 (HB1 Bogie1) or 53.1/2 (HB2 Bogie2)", 0.55),
+        ("TM blower motor or airflow restriction",           0.25),
+        ("BUR-II output (unbalanced BUR causes blower MCB trips)", 0.20),
+    ],
+    "MOTOR_TEMP_SENSOR_FAULT": [
+        ("Motor temperature sensor wiring (open or shorted)", 0.55),
+        ("DCU2/M board CON1-A605-A02/A607-A01/A607-A02",    0.30),
+        ("Motor temperature sensor element itself",          0.15),
+    ],
+    "TM_MOTOR_ISOLATED": [
+        ("Speed sensor or speed sensor wiring (most common transient cause)", 0.50),
+        ("TM blower MCB / cooling path — check before motor winding", 0.30),
+        ("CON1/CON2 motor converter board (if speed sensor checks clean)", 0.20),
     ],
 }
 

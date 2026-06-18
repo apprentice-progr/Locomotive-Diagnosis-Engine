@@ -220,6 +220,47 @@ ECODE_BOARD_MAP: Dict[str, dict] = {
     "20":   {"board_id": "BUR3_INT",   "description": "BUR3 internal fault (aux converter)",
              "part_ref": "EG_BUR3",    "replaces": "BUR3 rack inspection — Card 1302-1 or inverter",
              "confidence": 0.92},
+
+    # Traction motor temperature / sensor — CON1/CON2 3-digit event codes
+    # ECode 313/314/315 = TM 1/2/3 Too Hot (bogie 1 when in CON1 space)
+    # ECode 307–312 = Motor temperature sensor missing or implausible
+    "313":  {"board_id": "DCUM1_1",   "description": "Traction Motor 1 Overheat — Motor Conv 1 (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM1 board if blower healthy",
+             "confidence": 0.88},
+    "314":  {"board_id": "DCUM2_1",   "description": "Traction Motor 2 Overheat — Motor Conv 2 (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM2 board if blower healthy",
+             "confidence": 0.88},
+    "315":  {"board_id": "DCUM3_1",   "description": "Traction Motor 3 Overheat — Motor Conv 3 (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check MCB 53.1/1 (HB1) TM blower first; inspect DCUM3 board if blower healthy",
+             "confidence": 0.88},
+    "307":  {"board_id": "DCUM1_1",   "description": "TM1 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check TM1 sensor wiring; replace CON1-A605-A02 if wiring intact",
+             "confidence": 0.82},
+    "308":  {"board_id": "DCUM2_1",   "description": "TM2 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check TM2 sensor wiring; replace CON1-A607-A01 if wiring intact",
+             "confidence": 0.82},
+    "309":  {"board_id": "DCUM3_1",   "description": "TM3 temperature sensor missing/implausible (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check TM3 sensor wiring; replace CON1-A607-A02 if wiring intact",
+             "confidence": 0.82},
+    "310":  {"board_id": "DCUM1_1",   "description": "TM1 temp sensor implausible — redundant sensors differ (CON1)",
+             "part_ref": "CON1-A605-A02", "replaces": "Check TM1 sensor wiring; replace CON1-A605-A02 if wiring intact",
+             "confidence": 0.82},
+    "311":  {"board_id": "DCUM2_1",   "description": "TM2 temp sensor implausible (CON1)",
+             "part_ref": "CON1-A607-A01", "replaces": "Check TM2 sensor wiring; replace CON1-A607-A01 if wiring intact",
+             "confidence": 0.82},
+    "312":  {"board_id": "DCUM3_1",   "description": "TM3 temp sensor implausible (CON1)",
+             "part_ref": "CON1-A607-A02", "replaces": "Check TM3 sensor wiring; replace CON1-A607-A02 if wiring intact",
+             "confidence": 0.82},
+
+    # VCI parameter store — AMP parameter change error
+    # 514E/514F sit inside the "51" SPIF prefix but point to VCI parameter memory.
+    # Exact 4-char match takes priority over prefix, giving the right guidance.
+    "514E": {"board_id": "VCI_PARAM",  "description": "VCI parameter store — AMP parameter change error (DCU1)",
+             "part_ref": "CON1-VCI",   "replaces": "Re-download parameters via DDS; verify replacement card firmware matches loco spec",
+             "confidence": 0.88},
+    "514F": {"board_id": "VCI_PARAM",  "description": "VCI parameter store — AMP parameter change error (DCU2)",
+             "part_ref": "CON2-VCI",   "replaces": "Re-download parameters via DDS; verify replacement card firmware matches loco spec",
+             "confidence": 0.88},
 }
 
 # ---------------------------------------------------------------------------
